@@ -1,6 +1,7 @@
 "use client"
 
 import { ArrowRight, Zap, TrendingUp, Shield } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export function Hero() {
@@ -41,9 +42,11 @@ export function Hero() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
-            Launch App <ArrowRight className="w-4 h-4" />
-          </Button>
+          <Link href="/onboarding">
+            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
+              Launch App <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
           <Button size="lg" variant="outline">
             View Documentation
           </Button>
