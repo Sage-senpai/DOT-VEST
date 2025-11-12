@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Mail, Lock, User, Loader2, CheckCircle2 } from 'lucide-react'
+import { Zap, Mail, Lock, User, Loader2, CheckCircle2,Wallet } from 'lucide-react'
 import { useAuth } from '@/hooks/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import styles from './styles.module.css'
