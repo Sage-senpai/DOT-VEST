@@ -1,11 +1,14 @@
+// FILE: app/dashboard/aggregator/page.tsx
 "use client"
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ArrowRightLeft, Zap } from "lucide-react"
+import { Search, ArrowRightLeft, Zap, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
+import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { AIComingSoon } from "@/components/ui/ai-coming-soon"
 
 const tokenPools = [
   { name: "DOT POOL", symbol: "DOT", tvl: "$245M", risk: "Low", protocols: ["Bifrost", "Hydration", "Astar"] },
@@ -36,14 +39,29 @@ const calculateReturn = (depositAmount: number, durationMonths: number, apyPerce
 export default function Aggregator() {
   const router = useRouter()
   const { addStrategy } = useStrategyVaults()
+  const { selectedAccount, isReady } = usePolkadotExtension()
   const [selectedToken, setSelectedToken] = useState<number | null>(null)
   const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null)
   const [depositAmount, setDepositAmount] = useState("")
   const [durationMonths, setDurationMonths] = useState(1)
   const [isExecuting, setIsExecuting] = useState(false)
+  const [executionStatus, setExecutionStatus] = useState<{type: 'idle' | 'success' | 'error', message: string}>({
+    type: 'idle',
+    message: ''
+  })
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showAISection, setShowAISection] = useState(false)
 
   const currentTokenPool = selectedToken !== null ? tokenPools[selectedToken] : null
   const availableProtocols = currentTokenPool?.protocols || []
+
+  const filteredPools = useMemo(() => {
+    if (!searchQuery) return tokenPools
+    return tokenPools.filter(pool => 
+      pool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pool.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [searchQuery])
 
   const estimatedReturn = useMemo(() => {
     if (selectedToken === null || !selectedProtocol) return 0
@@ -64,25 +82,57 @@ export default function Aggregator() {
   }
 
   const handleExecuteStrategy = async () => {
-    if (!selectedToken || !selectedProtocol || !depositAmount) return
-
-    setIsExecuting(true)
-
-    const strategy = {
-      id: Date.now().toString(),
-      tokenName: tokenPools[selectedToken].name,
-      amount: Number.parseFloat(depositAmount),
-      duration: durationMonths,
-      protocol: selectedProtocol,
-      apy: protocolAPYs[tokenPools[selectedToken].name][selectedProtocol].toString(),
-      executedAt: new Date().toISOString(),
+    if (!selectedToken || !selectedProtocol || !depositAmount) {
+      setExecutionStatus({
+        type: 'error',
+        message: 'Please select a pool, protocol, and enter an amount'
+      })
+      return
     }
 
-    addStrategy(strategy)
+    if (!isReady) {
+      setExecutionStatus({
+        type: 'error',
+        message: 'Please connect your Polkadot wallet first'
+      })
+      return
+    }
 
-    // Redirect after a brief delay to ensure state is updated
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    router.push("/dashboard/vaults")
+    setIsExecuting(true)
+    setExecutionStatus({type: 'idle', message: ''})
+
+    try {
+      // Simulate blockchain transaction
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      const strategy = {
+        id: Date.now().toString(),
+        tokenName: tokenPools[selectedToken].name,
+        amount: Number.parseFloat(depositAmount),
+        duration: durationMonths,
+        protocol: selectedProtocol,
+        apy: protocolAPYs[tokenPools[selectedToken].name][selectedProtocol].toString(),
+        executedAt: new Date().toISOString(),
+      }
+
+      addStrategy(strategy)
+
+      setExecutionStatus({
+        type: 'success',
+        message: `Successfully deployed strategy to ${selectedProtocol}! Redirecting to vaults...`
+      })
+
+      // Redirect after showing success message
+      setTimeout(() => {
+        router.push("/dashboard/vaults")
+      }, 2000)
+    } catch (error) {
+      setExecutionStatus({
+        type: 'error',
+        message: 'Strategy execution failed. Please try again.'
+      })
+      setIsExecuting(false)
+    }
   }
 
   return (
@@ -92,6 +142,40 @@ export default function Aggregator() {
         <p className="text-muted-foreground">Select a token pool and optimize your yield strategy</p>
       </div>
 
+      {/* Wallet Connection Alert */}
+      {!isReady && (
+        <Card className="backdrop-blur-xl bg-destructive/10 border border-destructive/50 p-4 rounded-lg">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+            <p className="text-sm text-destructive">
+              Please connect your Polkadot wallet to execute strategies
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Execution Status */}
+      {executionStatus.type !== 'idle' && (
+        <Card className={`backdrop-blur-xl border p-4 rounded-lg ${
+          executionStatus.type === 'success' 
+            ? 'bg-accent/10 border-accent/50' 
+            : 'bg-destructive/10 border-destructive/50'
+        }`}>
+          <div className="flex items-center gap-3">
+            {executionStatus.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-accent" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            )}
+            <p className={`text-sm ${
+              executionStatus.type === 'success' ? 'text-accent' : 'text-destructive'
+            }`}>
+              {executionStatus.message}
+            </p>
+          </div>
+        </Card>
+      )}
+
       {/* Search & Filter */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex gap-4 mb-6">
@@ -100,57 +184,71 @@ export default function Aggregator() {
             <input
               type="text"
               placeholder="Search tokens..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
             />
           </div>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setShowAISection(!showAISection)}
+          >
             <Zap className="w-4 h-4 mr-2" />
             AI Recommendation
           </Button>
         </div>
 
         <div className="space-y-3">
-          {tokenPools.map((pool, idx) => (
-            <div
-              key={idx}
-              onClick={() => {
-                setSelectedToken(idx)
-                setSelectedProtocol(null)
-                setDepositAmount("")
-              }}
-              className={`p-4 rounded-lg cursor-pointer transition-all border flex items-center justify-between ${
-                selectedToken === idx
-                  ? "bg-primary/20 border-primary backdrop-blur-xl"
-                  : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
-              }`}
-            >
-              <div className="flex items-center gap-6 flex-1">
-                <div className="min-w-fit">
-                  <h4 className="font-semibold text-base">{pool.name}</h4>
-                  <p className="text-xs text-muted-foreground">{pool.symbol}</p>
-                </div>
-                <div className="flex items-center gap-8 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wide">TVL</span>
-                    <span className="font-semibold text-sm">{pool.tvl}</span>
+          {filteredPools.map((pool, idx) => {
+            const originalIdx = tokenPools.findIndex(p => p.name === pool.name)
+            return (
+              <div
+                key={originalIdx}
+                onClick={() => {
+                  setSelectedToken(originalIdx)
+                  setSelectedProtocol(null)
+                  setDepositAmount("")
+                  setExecutionStatus({type: 'idle', message: ''})
+                }}
+                className={`p-4 rounded-lg cursor-pointer transition-all border flex items-center justify-between ${
+                  selectedToken === originalIdx
+                    ? "bg-primary/20 border-primary backdrop-blur-xl"
+                    : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
+                }`}
+              >
+                <div className="flex items-center gap-6 flex-1">
+                  <div className="min-w-fit">
+                    <h4 className="font-semibold text-base">{pool.name}</h4>
+                    <p className="text-xs text-muted-foreground">{pool.symbol}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wide">RISK</span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded font-medium ${
-                        pool.risk === "Low" ? "bg-accent/20 text-accent" : "bg-secondary/20 text-secondary"
-                      }`}
-                    >
-                      {pool.risk}
-                    </span>
+                  <div className="flex items-center gap-8 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide">TVL</span>
+                      <span className="font-semibold text-sm">{pool.tvl}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide">RISK</span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded font-medium ${
+                          pool.risk === "Low" ? "bg-accent/20 text-accent" : "bg-secondary/20 text-secondary"
+                        }`}
+                      >
+                        {pool.risk}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <ArrowRightLeft className="w-5 h-5 text-muted-foreground" />
               </div>
-              <ArrowRightLeft className="w-5 h-5 text-muted-foreground" />
-            </div>
-          ))}
+            )
+          })}
         </div>
       </Card>
+
+      {/* AI Section */}
+      {showAISection && (
+        <AIComingSoon />
+      )}
 
       {selectedToken !== null && (
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
@@ -215,7 +313,7 @@ export default function Aggregator() {
 
             <Button
               onClick={handleExecuteStrategy}
-              disabled={!selectedProtocol || !depositAmount || isExecuting}
+              disabled={!selectedProtocol || !depositAmount || isExecuting || !isReady}
               className="w-full bg-primary hover:bg-primary/90 gap-2 disabled:opacity-50"
             >
               <ArrowRightLeft className="w-4 h-4" />

@@ -1,7 +1,7 @@
 // FILE: hooks/data/useAnalytics.ts
 // ========================================
 import { useQuery } from '@tanstack/react-query'
-import { analyticsQueries } from '@/lib/supabase/queries/analytics'
+import { analyticsQueries } from '../../lib/supabase/queries/analytics'
 import { useAuth } from '../auth/useAuth'
 
 export function useAnalytics(days: number = 7) {

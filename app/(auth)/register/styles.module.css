@@ -1,0 +1,329 @@
+/* FILE: app/(auth)/register/styles.module.css */ 
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.gradientBg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #e6007a15 0%, #06b6d415 100%);
+  z-index: -1;
+}
+
+.gradientBg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, #e6007a10 0%, transparent 70%);
+  animation: pulse 8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.content {
+  width: 100%;
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  align-self: center;
+  text-decoration: none;
+  transition: transform 0.3s;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+.logoIcon {
+  width: 2rem;
+  height: 2rem;
+  color: var(--primary);
+  filter: drop-shadow(0 0 8px rgba(230, 0, 122, 0.5));
+}
+
+.logoText {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card {
+  backdrop-filter: blur(20px);
+  background: rgb(var(--card) / 0.6);
+  border: 1px solid rgb(var(--border) / 0.8);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+}
+
+:global(.dark) .card {
+  background: rgb(var(--card) / 0.8);
+}
+
+.cardHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: rgb(var(--foreground));
+}
+
+.subtitle {
+  color: rgb(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.error {
+  padding: 0.75rem 1rem;
+  background: rgb(var(--destructive) / 0.1);
+  border: 1px solid rgb(var(--destructive) / 0.3);
+  border-radius: var(--radius);
+  color: var(--destructive);
+  font-size: 0.875rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(var(--foreground));
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: rgb(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  background: rgb(var(--background) / 0.5);
+  border: 1px solid rgb(var(--border) / 0.6);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: rgb(var(--foreground));
+  transition: all 0.3s;
+  outline: none;
+}
+
+:global(.dark) .input {
+  background: rgb(var(--input) / 0.3);
+  border-color: rgb(var(--border) / 0.8);
+}
+
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(var(--primary) / 0.1);
+}
+
+.input::placeholder {
+  color: rgb(var(--muted-foreground) / 0.7);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.forgotPassword {
+  text-align: right;
+  margin-top: -0.5rem;
+}
+
+.forgotPassword a {
+  color: var(--primary);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: opacity 0.3s;
+}
+
+.forgotPassword a:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.submitButton {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -5px rgb(230 0 122 / 0.3);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.5rem 0;
+  color: rgb(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgb(var(--border));
+}
+
+.divider span {
+  padding: 0 1rem;
+}
+
+.signupPrompt {
+  text-align: center;
+  font-size: 0.875rem;
+  color: rgb(var(--muted-foreground));
+}
+
+.signupLink {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.3s;
+}
+
+.signupLink:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgb(var(--muted-foreground));
+}
+
+.footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+.passwordHint {
+  font-size: 0.75rem;
+  color: rgb(var(--muted-foreground));
+  margin-top: -0.25rem;
+}
+
+.successCard {
+  backdrop-filter: blur(20px);
+  background: rgb(var(--card) / 0.8);
+  border: 1px solid rgb(var(--border) / 0.8);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 28rem;
+  margin: auto;
+}
+
+.successIcon {
+  width: 4rem;
+  height: 4rem;
+  color: var(--accent);
+  animation: scaleIn 0.5s ease-out;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+.successTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgb(var(--foreground));
+}
+
+.successText {
+  color: rgb(var(--muted-foreground));
+  font-size: 0.875rem;
+}

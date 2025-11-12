@@ -1,3 +1,4 @@
+// FILE: app/dashboard/layout.tsx
 "use client"
 
 import type React from "react"
@@ -19,6 +20,7 @@ const navItems = [
   { icon: Lock, label: "Vaults", href: "/dashboard/vaults" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+  { icon: User, label: "Profile", href: "/dashboard/profile"}
 ]
 
 export default function DashboardLayout({

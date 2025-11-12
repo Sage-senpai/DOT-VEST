@@ -1,10 +1,12 @@
+// FILE: app/dashboard/vaults/page.tsx
 "use client"
 
-import { useState } from "react"
-import { Lock, TrendingUp, Users, Zap } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Lock, TrendingUp, Users, Zap, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
+import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
 
 const vaults = [
   {
@@ -16,6 +18,7 @@ const vaults = [
     earned: "12.5 DOT",
     risk: "Low",
     strategy: "Native Staking + Liquid DOT",
+    minStake: "1 DOT",
   },
   {
     name: "Acala Yield Vault",
@@ -26,6 +29,7 @@ const vaults = [
     earned: "143 aUSD",
     risk: "Low",
     strategy: "aUSD Lending + Homa",
+    minStake: "10 aUSD",
   },
   {
     name: "Hydration Farming",
@@ -36,6 +40,7 @@ const vaults = [
     earned: "935 HDX",
     risk: "Medium",
     strategy: "Omnipool + LM",
+    minStake: "100 HDX",
   },
   {
     name: "Bifrost Vault",
@@ -46,13 +51,26 @@ const vaults = [
     earned: "76 BNC",
     risk: "Medium",
     strategy: "vsToken + Farming",
+    minStake: "10 BNC",
   },
 ]
 
 export default function Vaults() {
   const { strategies } = useStrategyVaults()
+  const { selectedAccount, isReady } = usePolkadotExtension()
   const [selectedVault, setSelectedVault] = useState<number | null>(null)
   const [depositAmount, setDepositAmount] = useState("")
+  const [withdrawAmount, setWithdrawAmount] = useState("")
+  const [isStaking, setIsStaking] = useState(false)
+  const [stakingStatus, setStakingStatus] = useState<{type: 'idle' | 'success' | 'error', message: string}>({
+    type: 'idle',
+    message: ''
+  })
+
+  // Import the integration hook at the top
+  // import { usePoolVaultIntegration } from "@/hooks/use-pool-vault-integration"
+  // const { getVaultPositions } = usePoolVaultIntegration()
+  // const poolVaults = getVaultPositions()
 
   const allVaults = [
     ...vaults,
@@ -60,13 +78,119 @@ export default function Vaults() {
       name: `${s.tokenName} - ${s.protocol}`,
       chain: s.protocol,
       apy: `${s.apy}%`,
-      tvl: `$${(Number.parseFloat(s.apy) * 1000).toFixed(1)}K`,
+      tvl: `${(Number.parseFloat(s.apy) * 1000).toFixed(1)}K`,
       deposited: `${s.amount} ${s.tokenName.replace(" POOL", "")}`,
       earned: `${((s.amount * Number.parseFloat(s.apy) * (s.duration / 12)) / 100).toFixed(2)} ${s.tokenName.replace(" POOL", "")}`,
-      risk: "Medium",
+      risk: s.duration <= 3 ? "Low" : "Medium",
       strategy: `${s.duration}-month strategy via ${s.protocol}`,
+      minStake: "0.1",
+      isFromPool: true, // Mark as coming from pool
+      executedAt: s.executedAt,
     })),
   ]
+
+  const handleStake = async () => {
+    if (!selectedAccount || !depositAmount || !selectedVault) {
+      setStakingStatus({type: 'error', message: 'Please connect wallet and enter amount'})
+      return
+    }
+
+    const amount = parseFloat(depositAmount)
+    const vault = allVaults[selectedVault]
+    const minStake = parseFloat(vault.minStake || "0")
+
+    if (amount < minStake) {
+      setStakingStatus({
+        type: 'error', 
+        message: `Minimum stake is ${vault.minStake}`
+      })
+      return
+    }
+
+    setIsStaking(true)
+    setStakingStatus({type: 'idle', message: ''})
+
+    try {
+      // Simulate blockchain transaction
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      setStakingStatus({
+        type: 'success',
+        message: `Successfully staked ${depositAmount} in ${vault.name}`
+      })
+      setDepositAmount("")
+      
+      // Reset success message after 5 seconds
+      setTimeout(() => {
+        setStakingStatus({type: 'idle', message: ''})
+      }, 5000)
+    } catch (error) {
+      setStakingStatus({
+        type: 'error',
+        message: 'Staking failed. Please try again.'
+      })
+    } finally {
+      setIsStaking(false)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    if (!selectedAccount || !withdrawAmount) {
+      setStakingStatus({type: 'error', message: 'Please enter withdrawal amount'})
+      return
+    }
+
+    setIsStaking(true)
+    setStakingStatus({type: 'idle', message: ''})
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      setStakingStatus({
+        type: 'success',
+        message: `Successfully withdrew ${withdrawAmount}`
+      })
+      setWithdrawAmount("")
+      
+      setTimeout(() => {
+        setStakingStatus({type: 'idle', message: ''})
+      }, 5000)
+    } catch (error) {
+      setStakingStatus({
+        type: 'error',
+        message: 'Withdrawal failed. Please try again.'
+      })
+    } finally {
+      setIsStaking(false)
+    }
+  }
+
+  const handleClaimRewards = async () => {
+    if (!selectedAccount || selectedVault === null) return
+
+    setIsStaking(true)
+    setStakingStatus({type: 'idle', message: ''})
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      setStakingStatus({
+        type: 'success',
+        message: `Successfully claimed ${allVaults[selectedVault].earned}`
+      })
+      
+      setTimeout(() => {
+        setStakingStatus({type: 'idle', message: ''})
+      }, 5000)
+    } catch (error) {
+      setStakingStatus({
+        type: 'error',
+        message: 'Claim failed. Please try again.'
+      })
+    } finally {
+      setIsStaking(false)
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -74,6 +198,40 @@ export default function Vaults() {
         <h2 className="text-3xl font-bold mb-2">Vaults & Staking</h2>
         <p className="text-muted-foreground">Deposit into optimized vaults and earn passive yield</p>
       </div>
+
+      {/* Wallet Connection Alert */}
+      {!isReady && (
+        <Card className="backdrop-blur-xl bg-destructive/10 border border-destructive/50 p-4 rounded-lg">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+            <p className="text-sm text-destructive">
+              Please connect your Polkadot wallet to stake and manage vaults
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Status Messages */}
+      {stakingStatus.type !== 'idle' && (
+        <Card className={`backdrop-blur-xl border p-4 rounded-lg ${
+          stakingStatus.type === 'success' 
+            ? 'bg-accent/10 border-accent/50' 
+            : 'bg-destructive/10 border-destructive/50'
+        }`}>
+          <div className="flex items-center gap-3">
+            {stakingStatus.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-accent" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            )}
+            <p className={`text-sm ${
+              stakingStatus.type === 'success' ? 'text-accent' : 'text-destructive'
+            }`}>
+              {stakingStatus.message}
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -156,7 +314,10 @@ export default function Vaults() {
               <p className="text-sm font-medium">{vault.strategy}</p>
             </div>
 
-            <Button className="w-full bg-primary hover:bg-primary/90 text-sm">
+            <Button 
+              className="w-full bg-primary hover:bg-primary/90 text-sm"
+              disabled={!isReady}
+            >
               {selectedVault === idx ? "Manage Vault" : "View Details"}
             </Button>
           </Card>
@@ -178,12 +339,19 @@ export default function Vaults() {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      placeholder="0.00"
+                      placeholder={`Min: ${allVaults[selectedVault].minStake || "0.1"}`}
                       value={depositAmount}
                       onChange={(e) => setDepositAmount(e.target.value)}
-                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                      disabled={!isReady || isStaking}
+                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 disabled:opacity-50"
                     />
-                    <Button variant="outline" size="sm" className="bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-transparent"
+                      disabled={!isReady || isStaking}
+                      onClick={() => setDepositAmount("100")}
+                    >
                       Max
                     </Button>
                   </div>
@@ -199,12 +367,18 @@ export default function Vaults() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Est. Annual Yield</span>
                     <span className="font-semibold text-accent">
-                      {depositAmount ? (Number.parseFloat(depositAmount) * 0.137).toFixed(2) : "0.00"} tokens
+                      {depositAmount ? (Number.parseFloat(depositAmount) * (parseFloat(allVaults[selectedVault].apy) / 100)).toFixed(2) : "0.00"} tokens
                     </span>
                   </div>
                 </div>
 
-                <Button className="w-full bg-primary hover:bg-primary/90">Deposit Now</Button>
+                <Button 
+                  className="w-full bg-primary hover:bg-primary/90"
+                  onClick={handleStake}
+                  disabled={!isReady || isStaking || !depositAmount}
+                >
+                  {isStaking ? "Processing..." : "Stake Now"}
+                </Button>
               </div>
             </div>
 
@@ -218,9 +392,18 @@ export default function Vaults() {
                     <input
                       type="number"
                       placeholder="0.00"
-                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      disabled={!isReady || isStaking}
+                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 disabled:opacity-50"
                     />
-                    <Button variant="outline" size="sm" className="bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-transparent"
+                      disabled={!isReady || isStaking}
+                      onClick={() => setWithdrawAmount(allVaults[selectedVault].deposited.split(" ")[0])}
+                    >
                       Max
                     </Button>
                   </div>
@@ -237,8 +420,13 @@ export default function Vaults() {
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full bg-transparent">
-                  Withdraw
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-transparent"
+                  onClick={handleWithdraw}
+                  disabled={!isReady || isStaking || !withdrawAmount}
+                >
+                  {isStaking ? "Processing..." : "Withdraw"}
                 </Button>
               </div>
             </div>
@@ -250,7 +438,13 @@ export default function Vaults() {
               <p className="font-semibold">Unclaimed Rewards</p>
               <p className="text-sm text-muted-foreground">{allVaults[selectedVault].earned}</p>
             </div>
-            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">Claim Rewards</Button>
+            <Button 
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              onClick={handleClaimRewards}
+              disabled={!isReady || isStaking}
+            >
+              {isStaking ? "Claiming..." : "Claim Rewards"}
+            </Button>
           </div>
         </Card>
       )}
@@ -280,7 +474,11 @@ export default function Vaults() {
                 <p className="font-bold text-accent">{stake.apy}</p>
                 <p className="text-xs text-muted-foreground">{stake.validators} validators</p>
               </div>
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
+              <Button 
+                size="sm" 
+                className="bg-primary hover:bg-primary/90"
+                disabled={!isReady}
+              >
                 Stake
               </Button>
             </div>

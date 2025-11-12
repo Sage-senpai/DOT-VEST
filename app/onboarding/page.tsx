@@ -1,3 +1,4 @@
+// FILE: app/onboarding/page.tsx
 "use client"
 
 import { useState } from "react"
@@ -242,9 +243,12 @@ export default function Onboarding() {
             </Button>
           )}
           {currentStep === 3 ? (
-            <Link href="/dashboard" className="flex-1">
-              <Button className="w-full bg-primary hover:bg-primary/90">Go to Dashboard</Button>
-            </Link>
+           <Link href="/dashboard" className="flex-1">
+  <Button className="w-full bg-primary hover:bg-primary/90">
+    Go to Dashboard
+  </Button>
+</Link>
+
           ) : (
             <Button
               className="flex-1 bg-primary hover:bg-primary/90"
