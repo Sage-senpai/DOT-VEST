@@ -43,9 +43,12 @@ export function Navbar() {
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
+            <Link href="/login">
             <Button variant="outline" size="sm">
               Sign In
             </Button>
+            </Link>
+            
             <Link href="/onboarding">
               <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 Launch App

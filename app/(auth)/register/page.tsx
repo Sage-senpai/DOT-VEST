@@ -110,7 +110,7 @@ export default function RegisterPage() {
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="John Doe"
+                  placeholder="Davi Sage"
                   className={styles.input}
                   required
                   disabled={loading}
@@ -129,7 +129,7 @@ export default function RegisterPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="you@example.com"
+                  placeholder="davisage@example.com"
                   className={styles.input}
                   required
                   disabled={loading}
