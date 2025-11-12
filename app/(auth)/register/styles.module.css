@@ -327,3 +327,40 @@
   color: rgb(var(--muted-foreground));
   font-size: 0.875rem;
 }
+
+
+
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: 
+    0 0 0 3px rgb(var(--primary) / 0.1),
+    0 0 20px rgba(230, 0, 122, 0.15),
+    inset 0 0 10px rgba(230, 0, 122, 0.05);
+  background: rgb(var(--background) / 0.8);
+}
+
+:global(.dark) .input:focus {
+  box-shadow: 
+    0 0 0 3px rgb(var(--primary) / 0.15),
+    0 0 30px rgba(230, 0, 122, 0.25),
+    inset 0 0 15px rgba(230, 0, 122, 0.1);
+}
+
+.input {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input:hover:not(:focus) {
+  border-color: rgb(var(--border) / 0.9);
+  background: rgb(var(--background) / 0.6);
+}
+
+/* Animated border glow on focus */
+@keyframes border-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(230, 0, 122, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(230, 0, 122, 0.6); }
+}
+
+.input:focus {
+  animation: border-glow 2s ease-in-out infinite;
+}

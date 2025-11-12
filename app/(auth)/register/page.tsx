@@ -9,11 +9,13 @@ import { Zap, Mail, Lock, User, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/hooks/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import styles from './styles.module.css'
+import { usePolkadotExtension } from '@/hooks/use-polkadot-extension'
 
 
 export default function RegisterPage() {
   const router = useRouter()
   const { signUp, loading } = useAuth()
+    const { connectWallet } = usePolkadotExtension()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -58,6 +60,15 @@ export default function RegisterPage() {
     } else {
       setSuccess(true)
       setTimeout(() => router.push('/dashboard'), 2000)
+    }
+  }
+  const handleWalletConnect = async () => {
+    try {
+      await connectWallet()
+      router.push('/onboarding')
+    } catch (err) {
+      console.error(err)
+      setError('Failed to connect wallet')
     }
   }
 
@@ -176,7 +187,25 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
+
+              </div>
+              <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or connect wallet</span>
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleWalletConnect}
+              className="w-full bg-transparent"
+            >
+              <Wallet className="w-4 h-4 mr-2" />
+              Connect Polkadot Wallet
+            </Button>
 
             <Button
               type="submit"

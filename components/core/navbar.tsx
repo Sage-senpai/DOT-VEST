@@ -1,13 +1,25 @@
+// FILE: components/core/navbar.tsx
 "use client"
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Menu, X, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "./theme-toggle"
+import { useAuth } from "@/hooks/auth/useAuth"
+import { useProfile } from "@/hooks/use-profile"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
+  const { user, signOut } = useAuth()
+  const { profile } = useProfile()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/")
+  }
 
   return (
     <nav className="fixed top-0 w-full z-50 backdrop-blur-xl bg-card/40 border border-border/50 border-b">
@@ -43,17 +55,37 @@ export function Navbar() {
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/login">
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-            </Link>
             
-            <Link href="/onboarding">
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Launch App
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <Link href="/dashboard">
+                  <Button size="sm" variant="outline">
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={handleSignOut}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -81,14 +113,36 @@ export function Navbar() {
               <ThemeToggle />
             </div>
             <div className="flex gap-2 px-4 pt-2">
-              <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                Sign In
-              </Button>
-              <Link href="/onboarding" className="flex-1">
-                <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
-                  Launch
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full bg-transparent">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={handleSignOut}
+                    className="flex-1 text-destructive"
+                  >
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full bg-transparent">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link href="/register" className="flex-1">
+                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
+                      Start
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

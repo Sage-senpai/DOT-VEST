@@ -12,6 +12,7 @@ import { ProfileModal } from "@/components/core/profile-modal"
 import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useProfile } from "@/hooks/use-profile"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useAuth } from "@/hooks/auth/useAuth"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -36,6 +37,7 @@ export default function DashboardLayout({
   const [mounted, setMounted] = useState(false)
   const { profile, mounted: profileMounted } = useProfile()
   const { selectedAccount, connectWallet, isReady, error } = usePolkadotExtension()
+  const { signOut } = useAuth()
 
   useEffect(() => {
     setMounted(true)
@@ -177,9 +179,9 @@ export default function DashboardLayout({
     "hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50",
     showSidebar ? "w-full justify-center gap-2" : ""
   )}
-  onClick={() => {
-    // Optional: clear any auth/session here
-    router.push("/") // <-- routes to your app's landing page
+  onClick={async () => {
+    await signOut()
+    router.push("/")
   }}
 >
   <LogOut className="w-4 h-4" />
