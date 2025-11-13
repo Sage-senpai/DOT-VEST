@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import {
   LineChart,
   Line,
@@ -19,6 +20,7 @@ import { TrendingUp, Wallet, Zap, Target } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { useProfile } from "@/hooks/use-profile"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
+import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
 
 const portfolioData = [
   { month: "Jan", value: 4000 },
@@ -34,6 +36,8 @@ const colors = ["#E6007A", "#a855f7", "#06b6d4", "#8b5cf6"]
 export default function Dashboard() {
   const { profile, mounted } = useProfile()
   const { strategies, mounted: strategiesMounted } = useStrategyVaults()
+  const { selectedAccount } = usePolkadotExtension()
+  const { theme } = useTheme()
   const [mounted2, setMounted2] = useState(false)
   const router = useRouter()
 
@@ -41,9 +45,22 @@ export default function Dashboard() {
     setMounted2(true)
   }, [])
 
+  // === Wallet-based filtering ===
+  const walletStrategies = selectedAccount
+    ? strategies.filter((s) => s.wallet_address === selectedAccount.address)
+    : strategies
+
+  const totalStrategies = walletStrategies.length
+
+  // === Dynamic chart colors based on theme ===
+  const textColor = theme === "dark" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)"
+  const gridColor = theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+  const tooltipBg = theme === "dark" ? "rgba(20,20,40,0.9)" : "rgba(255,255,255,0.9)"
+  const tooltipBorder = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"
+
   const assetAllocation =
-    strategiesMounted && strategies && strategies.length > 0
-      ? strategies.map((strategy, idx) => ({
+    strategiesMounted && walletStrategies && walletStrategies.length > 0
+      ? walletStrategies.map((strategy, idx) => ({
           name: strategy.tokenName.replace(" POOL", ""),
           value: Number(strategy.amount) || 0,
           color: colors[idx % colors.length],
@@ -75,9 +92,12 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Welcome, <span className="text-white dark:text-white">{profile.name}</span>
+                Welcome,{" "}
+                <span className="text-white dark:text-white">{profile.name}</span>
               </h1>
-              <p className="text-muted-foreground mt-2">Your Polkadot yield opportunities are looking stellar.</p>
+              <p className="text-muted-foreground mt-2">
+                Your Polkadot yield opportunities are looking stellar.
+              </p>
             </div>
           </div>
         </div>
@@ -120,7 +140,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Active Strategies</p>
-              <p className="text-2xl font-bold">{strategies.length}</p>
+              <p className="text-2xl font-bold">{totalStrategies}</p>
               <p className="text-xs text-secondary mt-1">All performing well</p>
             </div>
             <Zap className="w-8 h-8 text-secondary opacity-50" />
@@ -146,85 +166,59 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold mb-4">Portfolio Growth</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={portfolioData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" />
-              <YAxis stroke="rgba(255,255,255,0.5)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="month" stroke={textColor} />
+              <YAxis stroke={textColor} />
               <Tooltip
-                contentStyle={{ backgroundColor: "rgba(20,20,40,0.8)", border: "1px solid rgba(255,255,255,0.1)" }}
+                contentStyle={{
+                  backgroundColor: tooltipBg,
+                  border: `1px solid ${tooltipBorder}`,
+                  borderRadius: "8px",
+                  color: textColor,
+                }}
+                labelStyle={{ color: textColor }}
+                itemStyle={{ color: textColor }}
               />
-              <Line type="monotone" dataKey="value" stroke="#E6007A" strokeWidth={2} dot={false} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#E6007A"
+                strokeWidth={2}
+              />
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card
-          onClick={() => router.push("/dashboard/vaults")}
-          className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg cursor-pointer hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/20"
-        >
+        {/* Asset Allocation */}
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">Asset Allocation</h3>
-          {assetAllocation.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={assetAllocation}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {assetAllocation.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <p>No assets allocated yet</p>
-            </div>
-          )}
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={assetAllocation}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={100}
+                label
+              >
+                {assetAllocation.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: tooltipBg,
+                  border: `1px solid ${tooltipBorder}`,
+                  borderRadius: "8px",
+                  color: textColor,
+                }}
+                labelStyle={{ color: textColor }}
+                itemStyle={{ color: textColor }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </Card>
       </div>
-
-      {/* Recent Activity */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-        <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          {strategiesMounted && strategies && strategies.length > 0
-            ? strategies.slice(-3).map((strategy, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-card/50 hover:bg-card/80 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium text-sm">
-                      Executed {strategy.amount} {strategy.tokenName} strategy
-                    </p>
-                    <p className="text-xs text-muted-foreground">{strategy.protocol}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{strategy.apy}% APY</p>
-                </div>
-              ))
-            : [
-                { action: "Staked 100 DOT", chain: "Acala", time: "2 hours ago", status: "success" },
-                { action: "Claimed rewards", chain: "Hydration", time: "5 hours ago", status: "success" },
-                { action: "Rebalanced portfolio", chain: "Polkadot", time: "1 day ago", status: "success" },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-card/50 hover:bg-card/80 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{item.action}</p>
-                    <p className="text-xs text-muted-foreground">{item.chain}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{item.time}</p>
-                </div>
-              ))}
-        </div>
-      </Card>
     </div>
   )
 }

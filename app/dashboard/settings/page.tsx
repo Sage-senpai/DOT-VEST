@@ -4,13 +4,15 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Bell, Lock, Palette, Zap, Shield, Mail, User, Globe } from "lucide-react"
+import { Bell, Lock, Palette, Zap, Shield, User, Edit2, Save } from "lucide-react"
 import { useProfile } from "@/hooks/use-profile"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useAuth } from "@/hooks/auth/useAuth"
 
 export default function Settings() {
   const { profile, updateProfile } = useProfile()
   const { selectedAccount, accounts, selectAccount } = usePolkadotExtension()
+  const { user } = useAuth()
   
   const [notifications, setNotifications] = useState({
     yields: true,
@@ -33,16 +35,24 @@ export default function Settings() {
 
   const [email, setEmail] = useState("")
   const [saving, setSaving] = useState(false)
+  
+  // Wallet naming state
+  const [walletNames, setWalletNames] = useState<{[key: string]: string}>({})
+  const [editingWallet, setEditingWallet] = useState<string | null>(null)
 
   useEffect(() => {
     if (profile) {
       setEmail(profile.email || "")
+      // Load saved wallet names from profile or local storage
+      const savedNames = localStorage.getItem(`wallet_names_${user?.id}`)
+      if (savedNames) {
+        setWalletNames(JSON.parse(savedNames))
+      }
     }
-  }, [profile])
+  }, [profile, user])
 
   const handleSaveNotifications = async () => {
     setSaving(true)
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000))
     setSaving(false)
   }
@@ -58,6 +68,18 @@ export default function Settings() {
     setSaving(true)
     await updateProfile({ email })
     setSaving(false)
+  }
+
+  const handleSaveWalletName = (address: string, name: string) => {
+    const updatedNames = { ...walletNames, [address]: name }
+    setWalletNames(updatedNames)
+    // Save to local storage (or Supabase in production)
+    localStorage.setItem(`wallet_names_${user?.id}`, JSON.stringify(updatedNames))
+    setEditingWallet(null)
+  }
+
+  const getWalletDisplayName = (account: any) => {
+    return walletNames[account.address] || account.name || "Unnamed Account"
   }
 
   return (
@@ -80,7 +102,7 @@ export default function Settings() {
               type="text"
               value={profile?.name || ""}
               onChange={(e) => profile && updateProfile({ name: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
               placeholder="Your name"
             />
           </div>
@@ -91,7 +113,7 @@ export default function Settings() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
                 placeholder="you@example.com"
               />
               <Button 
@@ -106,7 +128,7 @@ export default function Settings() {
         </div>
       </Card>
 
-      {/* Connected Wallets */}
+      {/* Connected Wallets with Naming */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <Shield className="w-5 h-5 text-accent" />
@@ -114,48 +136,116 @@ export default function Settings() {
         </div>
         <div className="space-y-3">
           {accounts && accounts.length > 0 ? (
-            accounts.map((account) => (
-              <div
-                key={account.address}
-                className={`p-4 rounded-lg border transition-all ${
-                  selectedAccount?.address === account.address
-                    ? "bg-primary/10 border-primary"
-                    : "bg-card/50 border-border/50 hover:border-primary/30"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">{account.name || "Unnamed Account"}</p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {account.address.slice(0, 10)}...{account.address.slice(-8)}
+            accounts.map((account) => {
+              const isEditing = editingWallet === account.address
+              const displayName = getWalletDisplayName(account)
+              
+              return (
+                <div
+                  key={account.address}
+                  className={`p-4 rounded-lg border transition-all ${
+                    selectedAccount?.address === account.address
+                      ? "bg-primary/10 border-primary"
+                      : "bg-card/50 border-border/50 hover:border-primary/30"
+                  }`}
+                >
+                  <div className="space-y-3">
+                    {/* Wallet Name Section */}
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="text"
+                            defaultValue={displayName}
+                            placeholder="Enter wallet name"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveWalletName(account.address, e.currentTarget.value)
+                              } else if (e.key === 'Escape') {
+                                setEditingWallet(null)
+                              }
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-card/50 border border-primary/50 rounded-lg text-sm focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              const input = e.currentTarget.parentElement?.querySelector('input')
+                              if (input) {
+                                handleSaveWalletName(account.address, input.value)
+                              }
+                            }}
+                            className="bg-primary hover:bg-primary/90"
+                          >
+                            <Save className="w-3 h-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-sm flex-1">{displayName}</p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingWallet(account.address)}
+                            className="h-7 px-2"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Wallet Address */}
+                    <p className="text-xs text-muted-foreground font-mono bg-card/30 px-3 py-2 rounded">
+                      {account.address}
                     </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {selectedAccount?.address !== account.address && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => selectAccount(account.address)}
-                        className="bg-transparent"
-                      >
-                        Switch
-                      </Button>
-                    )}
-                    {selectedAccount?.address === account.address && (
-                      <span className="text-xs bg-accent/20 text-accent px-3 py-1 rounded-full">
-                        Active
-                      </span>
-                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex gap-2">
+                        {selectedAccount?.address !== account.address && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => selectAccount(account.address)}
+                            className="bg-transparent"
+                          >
+                            Switch to This Wallet
+                          </Button>
+                        )}
+                        {selectedAccount?.address === account.address && (
+                          <span className="text-xs bg-accent/20 text-accent px-3 py-1.5 rounded-full font-medium">
+                            ✓ Active Wallet
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No wallets connected. Please connect a Polkadot wallet.
-            </p>
+            <div className="text-center py-8">
+              <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <p className="text-sm text-muted-foreground mb-4">
+                No wallets connected. Please connect a Polkadot wallet.
+              </p>
+              <Button className="bg-primary hover:bg-primary/90">
+                Connect Wallet
+              </Button>
+            </div>
           )}
         </div>
+
+        {accounts && accounts.length > 0 && (
+          <div className="mt-4 p-3 bg-accent/10 border border-accent/30 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              💡 Tip: Click the edit icon to give your wallets custom names. 
+              Your strategies and transactions are linked to each wallet.
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* Notifications */}

@@ -1,4 +1,4 @@
-// FILE: app/dashboard/analytics/page.tsx
+//app/dashboard/analytics/page.tsx
 "use client"
 
 import {
@@ -15,6 +15,7 @@ import {
 } from "recharts"
 import { Card } from "@/components/ui/card"
 import { TrendingUp, TrendingDown } from "lucide-react"
+import { useTheme } from "next-themes"
 
 const performanceData = [
   { date: "Mon", yield: 120, fees: 20, net: 100 },
@@ -34,6 +35,14 @@ const chainPerformance = [
 ]
 
 export default function Analytics() {
+  const { theme } = useTheme()
+
+  const chartConfig = {
+    textColor: theme === "dark" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
+    gridColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+    tooltipBg: theme === "dark" ? "rgba(20,20,40,0.9)" : "rgba(255,255,255,0.9)",
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -79,11 +88,17 @@ export default function Analytics() {
         <h3 className="text-lg font-semibold mb-4">Weekly Performance</h3>
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={performanceData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="date" stroke="rgba(255,255,255,0.5)" />
-            <YAxis stroke="rgba(255,255,255,0.5)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartConfig.gridColor} />
+            <XAxis dataKey="date" stroke={chartConfig.textColor} />
+            <YAxis stroke={chartConfig.textColor} />
             <Tooltip
-              contentStyle={{ backgroundColor: "rgba(20,20,40,0.8)", border: "1px solid rgba(255,255,255,0.1)" }}
+              contentStyle={{
+                backgroundColor: chartConfig.tooltipBg,
+                border: `1px solid ${chartConfig.textColor}`,
+                color: chartConfig.textColor,
+              }}
+              labelStyle={{ color: chartConfig.textColor }}
+              itemStyle={{ color: chartConfig.textColor }}
             />
             <Legend />
             <Area type="monotone" dataKey="yield" stackId="1" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.3} />
@@ -97,11 +112,17 @@ export default function Analytics() {
         <h3 className="text-lg font-semibold mb-4">Performance by Chain</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chainPerformance}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="chain" stroke="rgba(255,255,255,0.5)" />
-            <YAxis stroke="rgba(255,255,255,0.5)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartConfig.gridColor} />
+            <XAxis dataKey="chain" stroke={chartConfig.textColor} />
+            <YAxis stroke={chartConfig.textColor} />
             <Tooltip
-              contentStyle={{ backgroundColor: "rgba(20,20,40,0.8)", border: "1px solid rgba(255,255,255,0.1)" }}
+              contentStyle={{
+                backgroundColor: chartConfig.tooltipBg,
+                border: `1px solid ${chartConfig.textColor}`,
+                color: chartConfig.textColor,
+              }}
+              labelStyle={{ color: chartConfig.textColor }}
+              itemStyle={{ color: chartConfig.textColor }}
             />
             <Legend />
             <Bar dataKey="apy" fill="#3b82f6" name="APY %" />

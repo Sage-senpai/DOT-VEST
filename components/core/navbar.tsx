@@ -15,6 +15,7 @@ export function Navbar() {
   const router = useRouter()
   const { user, signOut } = useAuth()
   const { profile } = useProfile()
+  
 
   const handleSignOut = async () => {
     await signOut()

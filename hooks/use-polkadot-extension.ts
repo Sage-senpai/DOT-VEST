@@ -11,6 +11,7 @@ interface UsePolkadotExtensionReturn {
   injector: any
   error: string | null
   connectWallet: () => Promise<void>
+  disconnectWallet: () => void
   isLoading: boolean
 }
 
@@ -22,27 +23,33 @@ export function usePolkadotExtension(): UsePolkadotExtensionReturn {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Check if extension is available on mount
   useEffect(() => {
-    // Check if extension is available on mount
     const checkExtension = async () => {
       try {
-        // Dynamically import to avoid SSR issues
-        const { web3Accounts, web3Enable } = await import("@polkadot/extension-dapp")
+        // Skip auto-connect if user previously disconnected
+        const wasDisconnected = sessionStorage.getItem("wallet_disconnected")
+        if (wasDisconnected === "true") {
+          console.log("[DOTVEST] Wallet auto-connect skipped (user disconnected)")
+          return
+        }
 
+        const { web3Accounts, web3Enable, web3FromSource } = await import("@polkadot/extension-dapp")
         const extensions = await web3Enable("DOTVEST")
 
         if (extensions.length > 0) {
           setIsReady(true)
-          // Get accounts from localStorage if previously selected
-          const savedAccountAddress = localStorage.getItem("selectedPolkadotAccount")
+
+          // Load accounts
           const accs = await web3Accounts()
           setAccounts(accs)
 
+          // Restore previously selected account
+          const savedAccountAddress = localStorage.getItem("selectedPolkadotAccount")
           if (savedAccountAddress && accs.length > 0) {
             const saved = accs.find((acc) => acc.address === savedAccountAddress)
             if (saved) {
               setSelectedAccount(saved)
-              const { web3FromSource } = await import("@polkadot/extension-dapp")
               const injectedExt = await web3FromSource(saved.meta.source)
               setInjector(injectedExt)
             }
@@ -52,7 +59,7 @@ export function usePolkadotExtension(): UsePolkadotExtensionReturn {
           setIsReady(false)
         }
       } catch (err) {
-        console.log("[v0] Extension check error:", err)
+        console.log("[DOTVEST] Extension check error:", err)
         setError("Polkadot.js extension not available")
         setIsReady(false)
       }
@@ -67,31 +74,27 @@ export function usePolkadotExtension(): UsePolkadotExtensionReturn {
       const { web3Accounts, web3Enable, web3FromSource } = await import("@polkadot/extension-dapp")
 
       const extensions = await web3Enable("DOTVEST")
-      if (extensions.length === 0) {
-        throw new Error("No Polkadot.js extension found")
-      }
+      if (extensions.length === 0) throw new Error("No Polkadot.js extension found")
 
       const accs = await web3Accounts()
-      if (accs.length === 0) {
-        throw new Error("No accounts found in extension")
-      }
+      if (accs.length === 0) throw new Error("No accounts found in extension")
 
-      // Select first account
       const account = accs[0]
       setSelectedAccount(account)
       setAccounts(accs)
-
-      // Save selected account to localStorage
       localStorage.setItem("selectedPolkadotAccount", account.address)
 
-      // Get injector for signing
       const injectedExt = await web3FromSource(account.meta.source)
       setInjector(injectedExt)
+
+      // Clear disconnection flag
+      sessionStorage.removeItem("wallet_disconnected")
+
       setError(null)
       setIsReady(true)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to connect wallet"
-      console.log("[v0] Wallet connection error:", errorMessage)
+      console.log("[DOTVEST] Wallet connection error:", errorMessage)
       setError(errorMessage)
     } finally {
       setIsLoading(false)
@@ -103,6 +106,13 @@ export function usePolkadotExtension(): UsePolkadotExtensionReturn {
     localStorage.setItem("selectedPolkadotAccount", account.address)
   }, [])
 
+  const disconnectWallet = useCallback(() => {
+    setSelectedAccount(null)
+    localStorage.removeItem("selectedPolkadotAccount")
+    sessionStorage.setItem("wallet_disconnected", "true")
+    console.log("[DOTVEST] Wallet manually disconnected.")
+  }, [])
+
   return {
     isReady,
     accounts,
@@ -111,6 +121,7 @@ export function usePolkadotExtension(): UsePolkadotExtensionReturn {
     injector,
     error,
     connectWallet,
+    disconnectWallet,
     isLoading,
   }
 }
