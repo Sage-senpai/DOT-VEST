@@ -1,3 +1,4 @@
+//app/page
 import { Navbar } from "@/components/core/navbar"
 import { Footer } from "@/components/core/footer"
 import { Hero } from "@/components/landing/hero"

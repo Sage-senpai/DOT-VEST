@@ -20,7 +20,7 @@ import { TrendingUp, Wallet, Zap, Target } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { useProfile } from "@/hooks/use-profile"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 
 const portfolioData = [
   { month: "Jan", value: 4000 },
@@ -36,7 +36,7 @@ const colors = ["#E6007A", "#a855f7", "#06b6d4", "#8b5cf6"]
 export default function Dashboard() {
   const { profile, mounted } = useProfile()
   const { strategies, mounted: strategiesMounted } = useStrategyVaults()
-  const { selectedAccount } = usePolkadotExtension()
+  const { selectedAccount } = useEnhancedPolkadot()
   const { theme } = useTheme()
   const [mounted2, setMounted2] = useState(false)
   const router = useRouter()
@@ -45,18 +45,22 @@ export default function Dashboard() {
     setMounted2(true)
   }, [])
 
-  // === Wallet-based filtering ===
   const walletStrategies = selectedAccount
     ? strategies.filter((s) => s.wallet_address === selectedAccount.address)
     : strategies
 
   const totalStrategies = walletStrategies.length
 
-  // === Dynamic chart colors based on theme ===
-  const textColor = theme === "dark" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)"
-  const gridColor = theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-  const tooltipBg = theme === "dark" ? "rgba(20,20,40,0.9)" : "rgba(255,255,255,0.9)"
-  const tooltipBorder = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"
+  // === FIXED THEME-BASED COLORS ===
+  const isDark = theme === 'dark'
+  
+  const chartColors = {
+    text: isDark ? '#ffffff' : '#1a1a1a',
+    grid: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+    line: '#E6007A', // Always pink primary
+    tooltipBg: isDark ? '#1a1a2e' : '#ffffff',
+    tooltipBorder: isDark ? 'rgba(230,0,122,0.3)' : 'rgba(0,0,0,0.1)',
+  }
 
   const assetAllocation =
     strategiesMounted && walletStrategies && walletStrategies.length > 0
@@ -93,7 +97,7 @@ export default function Dashboard() {
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Welcome,{" "}
-                <span className="text-white dark:text-white">{profile.name}</span>
+                <span className="text-foreground">{profile.name}</span>
               </h1>
               <p className="text-muted-foreground mt-2">
                 Your Polkadot yield opportunities are looking stellar.
@@ -159,31 +163,40 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Charts */}
+      {/* Charts with Fixed Colors */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Portfolio Growth */}
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg lg:col-span-2">
           <h3 className="text-lg font-semibold mb-4">Portfolio Growth</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={portfolioData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis dataKey="month" stroke={textColor} />
-              <YAxis stroke={textColor} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+              <XAxis 
+                dataKey="month" 
+                stroke={chartColors.text}
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis 
+                stroke={chartColors.text}
+                style={{ fontSize: '12px' }}
+              />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: tooltipBg,
-                  border: `1px solid ${tooltipBorder}`,
-                  borderRadius: "8px",
-                  color: textColor,
+                  backgroundColor: chartColors.tooltipBg,
+                  border: `1px solid ${chartColors.tooltipBorder}`,
+                  borderRadius: '8px',
+                  color: chartColors.text,
                 }}
-                labelStyle={{ color: textColor }}
-                itemStyle={{ color: textColor }}
+                labelStyle={{ color: chartColors.text }}
+                itemStyle={{ color: chartColors.text }}
               />
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#E6007A"
-                strokeWidth={2}
+                stroke={chartColors.line}
+                strokeWidth={3}
+                dot={{ fill: chartColors.line, r: 4 }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -198,8 +211,11 @@ export default function Dashboard() {
                 data={assetAllocation}
                 dataKey="value"
                 nameKey="name"
+                cx="50%"
+                cy="50%"
                 outerRadius={100}
-                label
+                label={(entry) => entry.name}
+                labelLine={{ stroke: chartColors.text }}
               >
                 {assetAllocation.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -207,13 +223,13 @@ export default function Dashboard() {
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: tooltipBg,
-                  border: `1px solid ${tooltipBorder}`,
-                  borderRadius: "8px",
-                  color: textColor,
+                  backgroundColor: chartColors.tooltipBg,
+                  border: `1px solid ${chartColors.tooltipBorder}`,
+                  borderRadius: '8px',
+                  color: chartColors.text,
                 }}
-                labelStyle={{ color: textColor }}
-                itemStyle={{ color: textColor }}
+                labelStyle={{ color: chartColors.text }}
+                itemStyle={{ color: chartColors.text }}
               />
             </PieChart>
           </ResponsiveContainer>

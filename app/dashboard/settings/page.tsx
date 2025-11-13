@@ -4,418 +4,429 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Bell, Lock, Palette, Zap, Shield, User, Edit2, Save } from "lucide-react"
 import { useProfile } from "@/hooks/use-profile"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useAuth } from "@/hooks/auth/useAuth"
+import { 
+  User, Mail, Bell, Shield, Wallet, 
+  Edit2, Save, X, Check, Trash2, Eye, EyeOff,
+  Lock, AlertCircle
+} from "lucide-react"
 
-export default function Settings() {
+export default function SettingsPage() {
   const { profile, updateProfile } = useProfile()
-  const { selectedAccount, accounts, selectAccount } = usePolkadotExtension()
   const { user } = useAuth()
+  const { connectedAccounts, selectedAccount, switchAccount, saveCustomName } = useEnhancedPolkadot()
   
-  const [notifications, setNotifications] = useState({
-    yields: true,
-    alerts: true,
-    updates: false,
-    security: true,
+  // Profile state
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    bio: ''
   })
-
-  const [preferences, setPreferences] = useState({
-    theme: "dark",
-    currency: "USD",
-    language: "en",
-  })
-
-  const [security, setSecurity] = useState({
-    twoFactorEnabled: false,
-    emailVerified: false,
-    sessionTimeout: "30",
-  })
-
-  const [email, setEmail] = useState("")
-  const [saving, setSaving] = useState(false)
   
   // Wallet naming state
-  const [walletNames, setWalletNames] = useState<{[key: string]: string}>({})
   const [editingWallet, setEditingWallet] = useState<string | null>(null)
+  const [walletName, setWalletName] = useState('')
+  
+  // Notification preferences
+  const [notifications, setNotifications] = useState({
+    email: true,
+    push: false,
+    transactionAlerts: true,
+    weeklyReports: true
+  })
+  
+  // Security
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  })
 
   useEffect(() => {
     if (profile) {
-      setEmail(profile.email || "")
-      // Load saved wallet names from profile or local storage
-      const savedNames = localStorage.getItem(`wallet_names_${user?.id}`)
-      if (savedNames) {
-        setWalletNames(JSON.parse(savedNames))
-      }
+      setProfileForm({
+        name: profile.name || '',
+        email: user?.email || '',
+        bio: profile.bio || ''
+      })
     }
   }, [profile, user])
 
-  const handleSaveNotifications = async () => {
-    setSaving(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSaving(false)
-  }
-
-  const handleSavePreferences = async () => {
-    setSaving(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSaving(false)
-  }
-
-  const handleUpdateEmail = async () => {
+  const handleProfileSave = async () => {
     if (!profile) return
-    setSaving(true)
-    await updateProfile({ email })
-    setSaving(false)
+    
+    await updateProfile({
+      name: profileForm.name,
+      bio: profileForm.bio
+    })
+    
+    setIsEditingProfile(false)
   }
 
-  const handleSaveWalletName = (address: string, name: string) => {
-    const updatedNames = { ...walletNames, [address]: name }
-    setWalletNames(updatedNames)
-    // Save to local storage (or Supabase in production)
-    localStorage.setItem(`wallet_names_${user?.id}`, JSON.stringify(updatedNames))
+  const handleWalletNameSave = (address: string) => {
+    if (walletName.trim()) {
+      saveCustomName(address, walletName.trim())
+    }
     setEditingWallet(null)
+    setWalletName('')
   }
 
-  const getWalletDisplayName = (account: any) => {
-    return walletNames[account.address] || account.name || "Unnamed Account"
+  const handlePasswordChange = async () => {
+    // Implement password change with Supabase
+    console.log('Changing password...')
+    // TODO: Add Supabase auth.updateUser({ password: passwordForm.new })
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h2 className="text-3xl font-bold mb-2">Settings</h2>
-        <p className="text-muted-foreground">Manage your account and preferences</p>
+        <p className="text-muted-foreground">Manage your account preferences and security</p>
       </div>
 
-      {/* Profile Information */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <User className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-semibold">Profile Information</h3>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Display Name</label>
-            <input
-              type="text"
-              value={profile?.name || ""}
-              onChange={(e) => profile && updateProfile({ name: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
-              placeholder="Your name"
-            />
+      {/* Profile Settings */}
+      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <User className="w-5 h-5 text-primary" />
+            <h3 className="text-xl font-semibold">Profile Information</h3>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Email Address</label>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
-                placeholder="you@example.com"
-              />
-              <Button 
-                onClick={handleUpdateEmail}
-                disabled={saving || email === profile?.email}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {saving ? "Saving..." : "Update"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Connected Wallets with Naming */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <Shield className="w-5 h-5 text-accent" />
-          <h3 className="text-lg font-semibold">Connected Wallets</h3>
-        </div>
-        <div className="space-y-3">
-          {accounts && accounts.length > 0 ? (
-            accounts.map((account) => {
-              const isEditing = editingWallet === account.address
-              const displayName = getWalletDisplayName(account)
-              
-              return (
-                <div
-                  key={account.address}
-                  className={`p-4 rounded-lg border transition-all ${
-                    selectedAccount?.address === account.address
-                      ? "bg-primary/10 border-primary"
-                      : "bg-card/50 border-border/50 hover:border-primary/30"
-                  }`}
-                >
-                  <div className="space-y-3">
-                    {/* Wallet Name Section */}
-                    <div className="flex items-center gap-2">
-                      {isEditing ? (
-                        <>
-                          <input
-                            type="text"
-                            defaultValue={displayName}
-                            placeholder="Enter wallet name"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveWalletName(account.address, e.currentTarget.value)
-                              } else if (e.key === 'Escape') {
-                                setEditingWallet(null)
-                              }
-                            }}
-                            className="flex-1 px-3 py-1.5 bg-card/50 border border-primary/50 rounded-lg text-sm focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              const input = e.currentTarget.parentElement?.querySelector('input')
-                              if (input) {
-                                handleSaveWalletName(account.address, input.value)
-                              }
-                            }}
-                            className="bg-primary hover:bg-primary/90"
-                          >
-                            <Save className="w-3 h-3" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-medium text-sm flex-1">{displayName}</p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingWallet(account.address)}
-                            className="h-7 px-2"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Wallet Address */}
-                    <p className="text-xs text-muted-foreground font-mono bg-card/30 px-3 py-2 rounded">
-                      {account.address}
-                    </p>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex gap-2">
-                        {selectedAccount?.address !== account.address && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => selectAccount(account.address)}
-                            className="bg-transparent"
-                          >
-                            Switch to This Wallet
-                          </Button>
-                        )}
-                        {selectedAccount?.address === account.address && (
-                          <span className="text-xs bg-accent/20 text-accent px-3 py-1.5 rounded-full font-medium">
-                            ✓ Active Wallet
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
+          {!isEditingProfile ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditingProfile(true)}
+              className="flex items-center gap-2"
+            >
+              <Edit2 className="w-4 h-4" />
+              Edit
+            </Button>
           ) : (
-            <div className="text-center py-8">
-              <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <p className="text-sm text-muted-foreground mb-4">
-                No wallets connected. Please connect a Polkadot wallet.
-              </p>
-              <Button className="bg-primary hover:bg-primary/90">
-                Connect Wallet
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditingProfile(false)}
+                className="flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleProfileSave}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+              >
+                <Save className="w-4 h-4" />
+                Save
               </Button>
             </div>
           )}
         </div>
 
-        {accounts && accounts.length > 0 && (
-          <div className="mt-4 p-3 bg-accent/10 border border-accent/30 rounded-lg">
-            <p className="text-xs text-muted-foreground">
-              💡 Tip: Click the edit icon to give your wallets custom names. 
-              Your strategies and transactions are linked to each wallet.
-            </p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Display Name</label>
+            {isEditingProfile ? (
+              <input
+                type="text"
+                value={profileForm.name}
+                onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                className="w-full px-4 py-2 bg-background/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            ) : (
+              <p className="text-muted-foreground">{profileForm.name || 'Not set'}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">Email Address</label>
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-muted-foreground" />
+              <p className="text-muted-foreground">{profileForm.email}</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">Bio</label>
+            {isEditingProfile ? (
+              <textarea
+                value={profileForm.bio}
+                onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-2 bg-background/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                placeholder="Tell us about yourself..."
+              />
+            ) : (
+              <p className="text-muted-foreground">{profileForm.bio || 'No bio added'}</p>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Wallet Management */}
+      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Wallet className="w-5 h-5 text-primary" />
+          <h3 className="text-xl font-semibold">Connected Wallets</h3>
+        </div>
+
+        {connectedAccounts.length === 0 ? (
+          <div className="text-center py-8">
+            <Wallet className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+            <p className="text-muted-foreground mb-4">No wallets connected</p>
+            <Button className="bg-primary hover:bg-primary/90">
+              Connect Wallet
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {connectedAccounts.map((account) => {
+              const isActive = account.address === selectedAccount?.address
+              const isEditing = editingWallet === account.address
+              const displayName = account.customName || account.name || 'Unnamed Account'
+
+              return (
+                <div
+                  key={account.address}
+                  className={`p-4 rounded-lg border transition-all ${
+                    isActive
+                      ? 'bg-primary/10 border-primary/30 shadow-lg shadow-primary/10'
+                      : 'bg-card/50 border-border/30 hover:border-primary/20'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={walletName}
+                          onChange={(e) => setWalletName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleWalletNameSave(account.address)
+                            if (e.key === 'Escape') {
+                              setEditingWallet(null)
+                              setWalletName('')
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 text-sm bg-background/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          placeholder="Enter wallet name..."
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleWalletNameSave(account.address)}
+                          className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
+                        >
+                          <Save className="w-4 h-4 text-accent" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingWallet(null)
+                            setWalletName('')
+                          }}
+                          className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{displayName}</span>
+                          <button
+                            onClick={() => {
+                              setEditingWallet(account.address)
+                              setWalletName(displayName)
+                            }}
+                            className="p-1.5 hover:bg-accent/10 rounded transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                        {isActive && (
+                          <span className="flex items-center gap-1 text-xs font-medium text-primary px-2 py-1 bg-primary/10 rounded-full">
+                            <Check className="w-3 h-3" />
+                            Active
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <code className="text-xs font-mono text-muted-foreground block mb-3">
+                    {account.address}
+                  </code>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-border/30">
+                    <span className="text-xs text-muted-foreground">
+                      via {account.source}
+                    </span>
+                    {!isActive && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => switchAccount(account.address)}
+                        className="text-xs"
+                      >
+                        Switch to This Wallet
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {connectedAccounts.length > 0 && (
+          <div className="mt-4 p-4 bg-accent/5 border border-accent/20 rounded-lg">
+            <div className="flex gap-2">
+              <AlertCircle className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-accent">Tip:</span> Your strategies and holdings are wallet-specific. 
+                Switch between wallets to manage different portfolios under one account.
+              </p>
+            </div>
           </div>
         )}
       </Card>
 
       {/* Notifications */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6">
         <div className="flex items-center gap-3 mb-6">
           <Bell className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-semibold">Notifications</h3>
+          <h3 className="text-xl font-semibold">Notification Preferences</h3>
         </div>
+
         <div className="space-y-4">
-          {[
-            { key: "yields", label: "Yield Updates", desc: "Get notified about yield changes" },
-            { key: "alerts", label: "Price Alerts", desc: "Receive alerts for price movements" },
-            { key: "updates", label: "Product Updates", desc: "Learn about new features" },
-            { key: "security", label: "Security Alerts", desc: "Important security notifications" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between p-3 rounded-lg bg-card/50">
-              <div>
-                <p className="font-medium text-sm">{item.label}</p>
-                <p className="text-xs text-muted-foreground">{item.desc}</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifications[item.key]}
-                  onChange={(e) => setNotifications({ ...notifications, [item.key]: e.target.checked })}
-                  className="sr-only peer"
+          {Object.entries({
+            email: 'Email Notifications',
+            push: 'Push Notifications',
+            transactionAlerts: 'Transaction Alerts',
+            weeklyReports: 'Weekly Performance Reports'
+          }).map(([key, label]) => (
+            <div key={key} className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
+              <span className="text-sm">{label}</span>
+              <button
+                onClick={() => setNotifications(prev => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  notifications[key as keyof typeof notifications]
+                    ? 'bg-primary'
+                    : 'bg-muted'
+                }`}
+              >
+                <div
+                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                    notifications[key as keyof typeof notifications]
+                      ? 'translate-x-6'
+                      : 'translate-x-0'
+                  }`}
                 />
-                <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
+              </button>
             </div>
           ))}
         </div>
-        <Button 
-          onClick={handleSaveNotifications}
-          disabled={saving}
-          className="w-full mt-4 bg-primary hover:bg-primary/90"
-        >
-          {saving ? "Saving..." : "Save Notification Settings"}
-        </Button>
       </Card>
 
       {/* Security */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Lock className="w-5 h-5 text-secondary" />
-          <h3 className="text-lg font-semibold">Security</h3>
+          <Shield className="w-5 h-5 text-primary" />
+          <h3 className="text-xl font-semibold">Security</h3>
         </div>
+
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-card/50">
+          <div className="flex items-center justify-between py-3">
             <div>
-              <p className="font-medium text-sm">Two-Factor Authentication</p>
-              <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+              <p className="font-medium">Change Password</p>
+              <p className="text-sm text-muted-foreground">Update your password regularly</p>
             </div>
-            <Button 
-              size="sm" 
-              variant={security.twoFactorEnabled ? "destructive" : "default"}
-              className={security.twoFactorEnabled ? "" : "bg-primary hover:bg-primary/90"}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowChangePassword(!showChangePassword)}
             >
-              {security.twoFactorEnabled ? "Disable" : "Enable"}
+              {showChangePassword ? 'Cancel' : 'Change'}
             </Button>
           </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-card/50">
-            <div>
-              <p className="font-medium text-sm">Email Verification</p>
-              <p className="text-xs text-muted-foreground">Verify your email address</p>
-            </div>
-            <span className={`text-xs px-3 py-1 rounded-full ${
-              security.emailVerified 
-                ? "bg-accent/20 text-accent" 
-                : "bg-destructive/20 text-destructive"
-            }`}>
-              {security.emailVerified ? "Verified" : "Not Verified"}
-            </span>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Session Timeout (minutes)</label>
-            <select
-              value={security.sessionTimeout}
-              onChange={(e) => setSecurity({ ...security, sessionTimeout: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-            >
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-              <option value="120">2 hours</option>
-            </select>
-          </div>
-        </div>
-      </Card>
 
-      {/* Preferences */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <Palette className="w-5 h-5 text-accent" />
-          <h3 className="text-lg font-semibold">Preferences</h3>
+          {showChangePassword && (
+            <div className="space-y-3 p-4 bg-background/50 rounded-lg border border-border/50">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.current}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.new}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <Button
+                onClick={handlePasswordChange}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Update Password
+              </Button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between py-3 border-t border-border/30">
+            <div>
+              <p className="font-medium">Two-Factor Authentication</p>
+              <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+            </div>
+            <Button size="sm" variant="outline">
+              Enable
+            </Button>
+          </div>
         </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Theme</label>
-            <select 
-              value={preferences.theme}
-              onChange={(e) => setPreferences({ ...preferences, theme: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-            >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="auto">Auto</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Currency</label>
-            <select 
-              value={preferences.currency}
-              onChange={(e) => setPreferences({ ...preferences, currency: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-            >
-              <option value="USD">USD ($)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="GBP">GBP (£)</option>
-              <option value="DOT">DOT</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Language</label>
-            <select 
-              value={preferences.language}
-              onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
-              className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-            >
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-            </select>
-          </div>
-        </div>
-        <Button 
-          onClick={handleSavePreferences}
-          disabled={saving}
-          className="w-full mt-4 bg-primary hover:bg-primary/90"
-        >
-          {saving ? "Saving..." : "Save Preferences"}
-        </Button>
       </Card>
 
       {/* Danger Zone */}
-      <Card className="backdrop-blur-xl bg-card/40 border border-destructive/50 p-6 rounded-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <Zap className="w-5 h-5 text-destructive" />
-          <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+      <Card className="backdrop-blur-xl bg-destructive/5 border border-destructive/30 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <AlertCircle className="w-5 h-5 text-destructive" />
+          <h3 className="text-xl font-semibold text-destructive">Danger Zone</h3>
         </div>
+
         <div className="space-y-3">
-          <Button
-            variant="outline"
-            className="w-full border-destructive/50 text-destructive hover:bg-destructive/10 bg-transparent justify-start"
-          >
-            Export Account Data
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full border-destructive/50 text-destructive hover:bg-destructive/10 bg-transparent justify-start"
-          >
-            Clear All Cache
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent justify-start"
-          >
-            Delete Account
-          </Button>
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <p className="font-medium">Delete Account</p>
+              <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
+            </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          </div>
         </div>
       </Card>
     </div>

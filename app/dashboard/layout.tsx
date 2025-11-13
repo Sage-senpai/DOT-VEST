@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button"
 import { ProfileModal } from "@/components/core/profile-modal"
 import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useProfile } from "@/hooks/use-profile"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useAuth } from "@/hooks/auth/useAuth"
 import { cn } from "@/lib/utils"
+import WalletManager from "@/components/core/wallet-manager"
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -36,7 +37,7 @@ export default function DashboardLayout({
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { profile, mounted: profileMounted } = useProfile()
-  const { selectedAccount, connectWallet, isReady, error } = usePolkadotExtension()
+  const { selectedAccount, connectWallet, isReady, error } = useEnhancedPolkadot()
   const { signOut } = useAuth()
 
   useEffect(() => {
@@ -170,31 +171,28 @@ export default function DashboardLayout({
           "p-4 border-t border-border/50",
           !showSidebar && "flex justify-center"
         )}>
-          
-         <Button 
-  variant="outline" 
-  size={showSidebar ? "sm" : "icon"}
-  className={cn(
-    "transition-all duration-300 hover:scale-105 active:scale-95",
-    "hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50",
-    showSidebar ? "w-full justify-center gap-2" : ""
-  )}
-  onClick={async () => {
-    await signOut()
-    router.push("/")
-  }}
->
-  <LogOut className="w-4 h-4" />
-  {showSidebar && "Logout"}
-</Button>
-          
-          
+          <Button 
+            variant="outline" 
+            size={showSidebar ? "sm" : "icon"}
+            className={cn(
+              "transition-all duration-300 hover:scale-105 active:scale-95",
+              "hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50",
+              showSidebar ? "w-full justify-center gap-2" : ""
+            )}
+            onClick={async () => {
+              await signOut()
+              router.push("/")
+            }}
+          >
+            <LogOut className="w-4 h-4" />
+            {showSidebar && "Logout"}
+          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto flex flex-col">
-        {/* Top Bar - Dynamic based on current page */}
+        {/* Top Bar */}
         <div className="h-16 backdrop-blur-xl bg-card/95 dark:bg-card/80 border-b border-border dark:border-border/70 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20">
           {/* Page Title */}
           <div className="flex items-center gap-4">
@@ -211,26 +209,8 @@ export default function DashboardLayout({
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
-            {/* Wallet Status */}
-            <div className={cn(
-              "hidden sm:flex px-4 py-2 rounded-lg text-sm transition-all duration-300",
-              "bg-card dark:bg-card/50 border border-border dark:border-border/70",
-              "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
-            )}>
-              {selectedAccount ? (
-                <>
-                  <span className="text-muted-foreground">Wallet: </span>
-                  <span className="text-primary dark:text-primary/90 font-semibold ml-1">
-                    {selectedAccount.address.slice(0, 6)}...{selectedAccount.address.slice(-4)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-muted-foreground">Polkadot:</span>
-                  <span className="text-accent dark:text-accent/90 font-semibold ml-1">Not connected</span>
-                </>
-              )}
-            </div>
+            {/* Enhanced Wallet Manager */}
+            <WalletManager />
 
             {/* Theme Toggle */}
             <ThemeToggle />

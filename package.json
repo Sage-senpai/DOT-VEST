@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@luno-kit/react": "^0.0.10",
+    "@luno-kit/ui": "^0.0.10",
     "@polkadot/api": "latest",
     "@polkadot/extension-dapp": "latest",
     "@polkadot/extension-inject": "latest",

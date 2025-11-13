@@ -37,10 +37,17 @@ const chainPerformance = [
 export default function Analytics() {
   const { theme } = useTheme()
 
-  const chartConfig = {
-    textColor: theme === "dark" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-    gridColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-    tooltipBg: theme === "dark" ? "rgba(20,20,40,0.9)" : "rgba(255,255,255,0.9)",
+  // === FIXED THEME-BASED COLORS ===
+  const isDark = theme === 'dark'
+  
+  const chartColors = {
+    text: isDark ? '#ffffff' : '#1a1a1a',
+    grid: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+    primary: '#E6007A', // Pink
+    secondary: '#06b6d4', // Cyan
+    accent: '#a855f7', // Purple
+    tooltipBg: isDark ? '#1a1a2e' : '#ffffff',
+    tooltipBorder: isDark ? 'rgba(230,0,122,0.3)' : 'rgba(0,0,0,0.1)',
   }
 
   return (
@@ -88,21 +95,47 @@ export default function Analytics() {
         <h3 className="text-lg font-semibold mb-4">Weekly Performance</h3>
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={performanceData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chartConfig.gridColor} />
-            <XAxis dataKey="date" stroke={chartConfig.textColor} />
-            <YAxis stroke={chartConfig.textColor} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+            <XAxis 
+              dataKey="date" 
+              stroke={chartColors.text}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis 
+              stroke={chartColors.text}
+              style={{ fontSize: '12px' }}
+            />
             <Tooltip
               contentStyle={{
-                backgroundColor: chartConfig.tooltipBg,
-                border: `1px solid ${chartConfig.textColor}`,
-                color: chartConfig.textColor,
+                backgroundColor: chartColors.tooltipBg,
+                border: `1px solid ${chartColors.tooltipBorder}`,
+                borderRadius: '8px',
+                color: chartColors.text,
               }}
-              labelStyle={{ color: chartConfig.textColor }}
-              itemStyle={{ color: chartConfig.textColor }}
+              labelStyle={{ color: chartColors.text }}
+              itemStyle={{ color: chartColors.text }}
             />
-            <Legend />
-            <Area type="monotone" dataKey="yield" stackId="1" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.3} />
-            <Area type="monotone" dataKey="fees" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+            <Legend 
+              wrapperStyle={{ color: chartColors.text }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="yield" 
+              stackId="1" 
+              stroke={chartColors.secondary} 
+              fill={chartColors.secondary} 
+              fillOpacity={0.6}
+              name="Yield"
+            />
+            <Area 
+              type="monotone" 
+              dataKey="fees" 
+              stackId="1" 
+              stroke="#ef4444" 
+              fill="#ef4444" 
+              fillOpacity={0.6}
+              name="Fees"
+            />
           </AreaChart>
         </ResponsiveContainer>
       </Card>
@@ -112,21 +145,41 @@ export default function Analytics() {
         <h3 className="text-lg font-semibold mb-4">Performance by Chain</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chainPerformance}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chartConfig.gridColor} />
-            <XAxis dataKey="chain" stroke={chartConfig.textColor} />
-            <YAxis stroke={chartConfig.textColor} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+            <XAxis 
+              dataKey="chain" 
+              stroke={chartColors.text}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis 
+              stroke={chartColors.text}
+              style={{ fontSize: '12px' }}
+            />
             <Tooltip
               contentStyle={{
-                backgroundColor: chartConfig.tooltipBg,
-                border: `1px solid ${chartConfig.textColor}`,
-                color: chartConfig.textColor,
+                backgroundColor: chartColors.tooltipBg,
+                border: `1px solid ${chartColors.tooltipBorder}`,
+                borderRadius: '8px',
+                color: chartColors.text,
               }}
-              labelStyle={{ color: chartConfig.textColor }}
-              itemStyle={{ color: chartConfig.textColor }}
+              labelStyle={{ color: chartColors.text }}
+              itemStyle={{ color: chartColors.text }}
             />
-            <Legend />
-            <Bar dataKey="apy" fill="#3b82f6" name="APY %" />
-            <Bar dataKey="tvl" fill="#06b6d4" name="TVL ($)" />
+            <Legend 
+              wrapperStyle={{ color: chartColors.text }}
+            />
+            <Bar 
+              dataKey="apy" 
+              fill={chartColors.primary}
+              name="APY %"
+              radius={[8, 8, 0, 0]}
+            />
+            <Bar 
+              dataKey="tvl" 
+              fill={chartColors.secondary}
+              name="TVL ($)"
+              radius={[8, 8, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </Card>
