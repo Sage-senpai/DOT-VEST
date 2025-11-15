@@ -5,7 +5,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Zap, Mail, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import styles from '../register/styles.module.css'
 
 export default function ForgotPasswordPage() {
@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     setLoading(true)
 
     try {
-      
+      const supabase = createClient()
       
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,

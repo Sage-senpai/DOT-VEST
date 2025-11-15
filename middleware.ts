@@ -1,37 +1,77 @@
 // FILE: middleware.ts
-// ========================================
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: any) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Protect dashboard routes
-  if (req.nextUrl.pathname.startsWith('/dashboard')) {
-    if (!session) {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/login'
-      redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
+  // Protected routes - redirect to login if not authenticated
+  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+    return NextResponse.redirect(
+      new URL(`/login?redirectedFrom=${request.nextUrl.pathname}`, request.url)
+    )
   }
 
-  // Redirect authenticated users away from auth pages
-  if (
-    session &&
-    (req.nextUrl.pathname.startsWith('/login') ||
-      req.nextUrl.pathname.startsWith('/register'))
-  ) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // Auth routes - redirect to dashboard if already authenticated
+  if (['/login', '/register'].includes(request.nextUrl.pathname) && user) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return res
+  return response
 }
 
 export const config = {
@@ -39,5 +79,6 @@ export const config = {
     '/dashboard/:path*',
     '/login',
     '/register',
+    '/onboarding',
   ],
 }

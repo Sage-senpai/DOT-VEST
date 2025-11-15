@@ -3,10 +3,11 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, Wallet, Shield, Zap, CheckCircle, User, ExternalLink } from "lucide-react"
+import { ArrowRight, ArrowLeft, Wallet, Shield, Zap, CheckCircle, User, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useProfile } from "@/hooks/use-profile"
+import { useAuth } from "@/hooks/auth/useAuth"
 import Link from "next/link"
 
 const WALLET_OPTIONS = [
@@ -27,12 +28,6 @@ const WALLET_OPTIONS = [
     name: "Talisman",
     icon: "🌟",
     downloadUrl: "https://talisman.xyz/",
-  },
-  {
-    id: "metamask",
-    name: "MetaMask Snap",
-    icon: "🦊",
-    downloadUrl: "https://snaps.metamask.io/snap/npm/chainsafe/polkadot-snap/",
   },
   {
     id: "nova",
@@ -65,28 +60,28 @@ const steps = [
 
 export default function Onboarding() {
   const router = useRouter()
-  const { selectedAccount, accounts, connectWallet, isReady, selectAccount } = usePolkadotExtension()
+  const { user } = useAuth()
+  const { selectedAccount, connectedAccounts, connectWallet, disconnectWallet, isReady, switchAccount } = useEnhancedPolkadot()
   const { profile, updateProfile } = useProfile()
   
   const [currentStep, setCurrentStep] = useState(1)
   const [connecting, setConnecting] = useState(false)
-  const [accountNames, setAccountNames] = useState<{[key: string]: string}>({})
   const [formData, setFormData] = useState({
     username: "",
+    bio: "",
     avatarChoice: "default-1",
   })
+  const [customWalletNames, setCustomWalletNames] = useState<{[key: string]: string}>({})
 
+  // Check if user needs to register/login
   useEffect(() => {
-    if (profile) {
-      if (!selectedAccount && !isReady) {
-        setCurrentStep(1)
-      } else if (selectedAccount && !profile.username) {
-        setCurrentStep(2)
-      } else {
-        setCurrentStep(3)
-      }
+    if (selectedAccount && !user && currentStep === 1) {
+      // Wallet connected but no user account - need to register
+      const walletAddress = selectedAccount.address
+      localStorage.setItem('pending_wallet_address', walletAddress)
+      // Stay on step 1 and show message to register
     }
-  }, [profile, selectedAccount, isReady])
+  }, [selectedAccount, user, currentStep])
 
   const handleConnectWallet = async () => {
     setConnecting(true)
@@ -99,28 +94,81 @@ export default function Onboarding() {
     }
   }
 
-  const handleSelectAccount = (address: string) => {
-    selectAccount(address)
+  const handleDisconnectWallet = () => {
+    disconnectWallet()
   }
 
-  const handleAccountNameChange = (address: string, name: string) => {
-    setAccountNames(prev => ({ ...prev, [address]: name }))
+  const handleSelectAccount = (address: string) => {
+    switchAccount(address)
+  }
+
+  const handleWalletNameChange = (address: string, name: string) => {
+    setCustomWalletNames(prev => ({ ...prev, [address]: name }))
   }
 
   const handleNext = () => {
+    if (currentStep === 1) {
+      if (!selectedAccount) {
+        return // Can't proceed without wallet
+      }
+      if (!user) {
+        // Wallet connected but no user - redirect to register
+        localStorage.setItem('pending_wallet_address', selectedAccount.address)
+        router.push('/register')
+        return
+      }
+    }
+    
+    if (currentStep === 2 && !formData.username.trim()) {
+      return // Can't proceed without username
+    }
+    
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1)
     }
   }
 
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
   const handleComplete = async () => {
-    await updateProfile({
-      username: formData.username,
-      profileImage: `/avatars/${formData.avatarChoice}.png`,
-      walletAddress: selectedAccount?.address,
-      walletName: accountNames[selectedAccount?.address || ""] || selectedAccount?.name,
-    })
-    router.push("/dashboard")
+    if (!selectedAccount) {
+      console.error('No wallet selected')
+      return
+    }
+
+    if (!user) {
+      console.error('User not authenticated')
+      router.push('/register')
+      return
+    }
+
+    try {
+      await updateProfile({
+        name: formData.username,
+        bio: formData.bio,
+        profile_image: `/avatars/${formData.avatarChoice}.png`,
+        wallet_address: selectedAccount.address,
+      })
+
+      // Save custom wallet name if provided
+      const customName = customWalletNames[selectedAccount.address]
+      if (customName) {
+        const savedNames = JSON.parse(localStorage.getItem('wallet_custom_names') || '{}')
+        savedNames[selectedAccount.address] = customName
+        localStorage.setItem('wallet_custom_names', JSON.stringify(savedNames))
+      }
+
+      // Clear pending wallet address
+      localStorage.removeItem('pending_wallet_address')
+
+      router.push("/dashboard")
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error)
+    }
   }
 
   const avatarOptions = [
@@ -132,39 +180,57 @@ export default function Onboarding() {
     { id: "default-6", emoji: "🎭" },
   ]
 
+  const canProceed = () => {
+    if (currentStep === 1) return selectedAccount !== null && user !== null
+    if (currentStep === 2) return formData.username.trim().length > 0
+    return true
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
+        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Welcome to DOTVEST</h1>
           <p className="text-lg text-muted-foreground">
             {currentStep === 1 && "Connect your Polkadot wallet to get started"}
-            {currentStep === 2 && "Choose your username and avatar"}
+            {currentStep === 2 && "Tell us about yourself"}
             {currentStep === 3 && "You're all set! Start optimizing your yields"}
           </p>
         </div>
 
+        {/* Progress Steps */}
         <div className="flex gap-4 mb-12">
           {steps.map((step) => (
             <div key={step.id} className="flex-1">
               <div
-                className={`h-2 rounded-full transition-all ${
-                  step.id <= currentStep ? "bg-primary" : "bg-border"
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  step.id < currentStep
+                    ? "bg-accent"
+                    : step.id === currentStep
+                    ? "bg-primary"
+                    : "bg-border"
                 }`}
               />
-              <p className="text-xs text-muted-foreground mt-2 text-center">{step.title}</p>
+              <p className={`text-xs mt-2 text-center transition-colors ${
+                step.id === currentStep ? "text-foreground font-medium" : "text-muted-foreground"
+              }`}>
+                {step.title}
+              </p>
             </div>
           ))}
         </div>
 
+        {/* Content Card */}
         <div className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg mb-8">
+          {/* Step 1: Connect Wallet */}
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-8">
                 <Wallet className="w-16 h-16 text-primary mx-auto mb-4 opacity-50" />
                 <h2 className="text-2xl font-bold mb-2">Connect Your Polkadot Wallet</h2>
                 <p className="text-muted-foreground">
-                  Install and connect a Polkadot-compatible wallet
+                  Install and connect a Polkadot-compatible wallet extension
                 </p>
               </div>
 
@@ -175,11 +241,23 @@ export default function Onboarding() {
                     disabled={connecting}
                     className="w-full p-6 bg-primary hover:bg-primary/90 text-lg"
                   >
-                    {connecting ? "Connecting..." : "Connect Wallet"}
+                    {connecting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="w-5 h-5 mr-2" />
+                        Connect Wallet
+                      </>
+                    )}
                   </Button>
 
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-center">Available Wallets:</p>
+                    <p className="text-sm font-medium text-center text-muted-foreground">
+                      Supported Wallets:
+                    </p>
                     {WALLET_OPTIONS.map((wallet) => (
                       <a
                         key={wallet.id}
@@ -199,7 +277,7 @@ export default function Onboarding() {
 
                   <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg">
                     <p className="text-sm text-muted-foreground">
-                      After installing, refresh this page and click "Connect Wallet"
+                      💡 <strong>Tip:</strong> After installing, refresh this page and click "Connect Wallet"
                     </p>
                   </div>
                 </div>
@@ -207,23 +285,55 @@ export default function Onboarding() {
                 <div className="space-y-4">
                   <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-accent flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-sm">Wallet Connected</p>
-                      <p className="text-xs text-muted-foreground">Extension detected successfully</p>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">Wallet Extension Detected</p>
+                      <p className="text-xs text-muted-foreground">
+                        {connectedAccounts.length} account(s) available
+                      </p>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleDisconnectWallet}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Disconnect
+                    </Button>
                   </div>
 
-                  {accounts && accounts.length > 0 && (
+                  {!user && selectedAccount && (
+                    <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+                      <p className="text-sm font-semibold mb-2">⚠️ Account Required</p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Please create an account or sign in to continue with this wallet.
+                      </p>
+                      <div className="flex gap-2">
+                        <Link href="/register" className="flex-1">
+                          <Button className="w-full bg-primary hover:bg-primary/90" size="sm">
+                            Create Account
+                          </Button>
+                        </Link>
+                        <Link href="/login" className="flex-1">
+                          <Button variant="outline" className="w-full" size="sm">
+                            Sign In
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {connectedAccounts.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Select Account:</p>
-                      {accounts.map((account) => (
+                      <p className="text-sm font-medium">Select an Account:</p>
+                      {connectedAccounts.map((account) => (
                         <div key={account.address} className="space-y-2">
                           <button
                             onClick={() => handleSelectAccount(account.address)}
                             className={`w-full p-4 rounded-lg border transition-all ${
                               selectedAccount?.address === account.address
-                                ? "bg-primary/20 border-primary"
-                                : "bg-card/50 border-border/50 hover:border-primary/50"
+                                ? "bg-primary/20 border-primary shadow-lg shadow-primary/20"
+                                : "bg-card/50 border-border/50 hover:border-primary/50 hover:bg-card/70"
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -231,7 +341,9 @@ export default function Onboarding() {
                                 {account.name?.charAt(0).toUpperCase() || "?"}
                               </div>
                               <div className="flex-1 text-left">
-                                <p className="font-medium text-sm">{account.name || "Unnamed Account"}</p>
+                                <p className="font-medium text-sm">
+                                  {account.customName || account.name || "Unnamed Account"}
+                                </p>
                                 <p className="text-xs text-muted-foreground font-mono">
                                   {account.address.slice(0, 8)}...{account.address.slice(-6)}
                                 </p>
@@ -243,16 +355,16 @@ export default function Onboarding() {
                           </button>
 
                           {selectedAccount?.address === account.address && (
-                            <div className="pl-4">
-                              <label className="text-xs font-medium mb-1 block">
-                                Name this account (optional):
+                            <div className="pl-4 animate-in slide-in-from-top-2 duration-300">
+                              <label className="text-xs font-medium mb-1 block text-muted-foreground">
+                                Give this account a friendly name (optional):
                               </label>
                               <input
                                 type="text"
-                                placeholder={account.name || "Enter account name"}
-                                value={accountNames[account.address] || ""}
-                                onChange={(e) => handleAccountNameChange(account.address, e.target.value)}
-                                className="w-full px-3 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                                placeholder={account.name || "e.g., My Main Wallet"}
+                                value={customWalletNames[account.address] || ""}
+                                onChange={(e) => handleWalletNameChange(account.address, e.target.value)}
+                                className="w-full px-3 py-2 bg-background/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                               />
                             </div>
                           )}
@@ -265,34 +377,44 @@ export default function Onboarding() {
             </div>
           )}
 
+          {/* Step 2: Profile Setup */}
           {currentStep === 2 && (
             <div className="space-y-6">
               <div className="text-center mb-8">
                 <Shield className="w-16 h-16 text-secondary mx-auto mb-4 opacity-50" />
                 <h2 className="text-2xl font-bold mb-2">Complete Your Profile</h2>
-                <p className="text-muted-foreground">Choose your username and avatar</p>
+                <p className="text-muted-foreground">Choose your username and customize your profile</p>
               </div>
 
               <div className="space-y-6">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Username</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <User className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Choose a unique username"
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(230,0,122,0.1)]"
-                      />
-                    </div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Username <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Choose a unique username"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2 bg-background/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+                    />
                   </div>
-                  {profile?.name && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Full name: {profile.name}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will be your display name across DotVest
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Bio (optional)</label>
+                  <textarea
+                    placeholder="Tell us about yourself..."
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                  />
                 </div>
 
                 <div>
@@ -304,8 +426,8 @@ export default function Onboarding() {
                         onClick={() => setFormData({ ...formData, avatarChoice: avatar.id })}
                         className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
                           formData.avatarChoice === avatar.id
-                            ? "border-primary bg-primary/10"
-                            : "border-border/50 bg-card/50"
+                            ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
+                            : "border-border/50 bg-card/50 hover:border-primary/30"
                         }`}
                       >
                         <span className="text-4xl">{avatar.emoji}</span>
@@ -318,27 +440,18 @@ export default function Onboarding() {
                   <div className="p-4 bg-card/50 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
                     <p className="text-sm font-semibold mb-1">
-                      {accountNames[selectedAccount.address] || selectedAccount.name || "Account"}
+                      {customWalletNames[selectedAccount.address] || selectedAccount.customName || selectedAccount.name || "Account"}
                     </p>
-                    <p className="text-xs font-mono text-muted-foreground">
+                    <p className="text-xs font-mono text-muted-foreground break-all">
                       {selectedAccount.address}
                     </p>
-                  </div>
-                )}
-
-                {profile?.email && (
-                  <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg">
-                    <p className="text-sm font-semibold mb-2">Profile Information</p>
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>Email: {profile.email}</p>
-                      {profile.name && <p>Name: {profile.name}</p>}
-                    </div>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {/* Step 3: Ready to Go */}
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="text-center mb-8">
@@ -349,12 +462,27 @@ export default function Onboarding() {
 
               <div className="space-y-4">
                 <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
-                  <h3 className="font-semibold mb-2">What's Next?</h3>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    What's Next?
+                  </h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>• Explore token pools and strategies</li>
-                    <li>• Deposit into high-yield vaults</li>
-                    <li>• Track your portfolio performance</li>
-                    <li>• Earn rewards across multiple chains</li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Explore high-yield token pools and strategies
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Deposit into automated vaults
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Track your portfolio performance in real-time
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Earn rewards across multiple parachains
+                    </li>
                   </ul>
                 </div>
 
@@ -365,14 +493,20 @@ export default function Onboarding() {
                         {avatarOptions.find((a) => a.id === formData.avatarChoice)?.emoji || "👤"}
                       </div>
                       <div>
-                        <p className="font-semibold">{formData.username || "User"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {accountNames[selectedAccount.address] || selectedAccount.name || "Account"}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          {selectedAccount.address.slice(0, 8)}...{selectedAccount.address.slice(-6)}
-                        </p>
+                        <p className="font-semibold">{formData.username}</p>
+                        {formData.bio && (
+                          <p className="text-xs text-muted-foreground">{formData.bio}</p>
+                        )}
                       </div>
+                    </div>
+                    <div className="pt-3 border-t border-border/30">
+                      <p className="text-xs text-muted-foreground mb-1">Wallet</p>
+                      <p className="text-sm font-medium">
+                        {customWalletNames[selectedAccount.address] || selectedAccount.name || "Account"}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {selectedAccount.address.slice(0, 8)}...{selectedAccount.address.slice(-6)}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -381,47 +515,49 @@ export default function Onboarding() {
           )}
         </div>
 
+        {/* Navigation Buttons */}
         <div className="flex gap-4">
-          {currentStep > 1 && currentStep < 3 && (
+          {currentStep > 1 && (
             <Button
               variant="outline"
               className="flex-1 bg-transparent"
-              onClick={() => setCurrentStep(currentStep - 1)}
+              onClick={handleBack}
             >
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
           )}
 
-          {currentStep === 1 && selectedAccount && (
-            <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={handleNext}>
-              Continue <ArrowRight className="w-4 h-4 ml-2" />
+          {currentStep < 3 ? (
+            <Button
+              className={`${currentStep === 1 ? 'flex-1' : 'flex-1'} bg-primary hover:bg-primary/90`}
+              onClick={handleNext}
+              disabled={!canProceed()}
+            >
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          )}
-
-          {currentStep === 2 && (
+          ) : (
             <Button
               className="flex-1 bg-primary hover:bg-primary/90"
-              onClick={handleNext}
-              disabled={!formData.username.trim()}
+              onClick={handleComplete}
             >
-              Continue <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          )}
-
-          {currentStep === 3 && (
-            <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={handleComplete}>
+              <Zap className="w-4 h-4 mr-2" />
               Go to Dashboard
             </Button>
           )}
         </div>
 
-        <div className="text-center mt-6">
-          <Link href="/dashboard">
-            <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Skip for now
-            </button>
-          </Link>
-        </div>
+        {/* Skip Link */}
+        {user && (
+          <div className="text-center mt-6">
+            <Link href="/dashboard">
+              <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Skip for now →
+              </button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,10 +1,12 @@
+// FILE: components/core/profile-modal.tsx
 "use client"
 
-import type React from "react"
-import { useState } from "react"
-import { X, Camera, Copy, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { X, User, Mail, Wallet, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProfile } from "@/hooks/use-profile"
+import { useAuth } from "@/hooks/auth/useAuth"
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -13,181 +15,130 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalProps) {
-  const { profile, updateProfile } = useProfile()
-  const [name, setName] = useState(profile?.name || "")
-  const [profileImage, setProfileImage] = useState(profile?.profileImage || "")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [previewImage, setPreviewImage] = useState(profileImage)
-  const [copied, setCopied] = useState(false)
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64 = reader.result as string
-        setPreviewImage(base64)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleCopyWallet = () => {
-    if (walletAddress) {
-      navigator.clipboard.writeText(walletAddress)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (name.trim()) {
-      setIsSubmitting(true)
-      setTimeout(() => {
-        updateProfile({
-          name: name.trim(),
-          profileImage: previewImage,
-        })
-        setIsSubmitting(false)
-        onClose()
-      }, 300)
-    }
-  }
+  const router = useRouter()
+  const { profile } = useProfile()
+  const { user } = useAuth()
 
   if (!isOpen) return null
 
-  if (profile?.name && isOpen) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative z-10 w-full max-w-md mx-4 backdrop-blur-xl bg-card/80 border border-border/50 rounded-2xl p-8 shadow-2xl">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-card/60 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                {profile.name}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-2">Your DOTVEST Profile</p>
-            </div>
+  const handleEditProfile = () => {
+    onClose()
+    router.push('/dashboard/profile')
+  }
 
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
-                {profile.profileImage ? (
-                  <img
-                    src={profile.profileImage || "/placeholder.svg"}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-2xl font-bold text-primary-foreground">
-                    {profile.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {walletAddress && (
-              <div className="p-4 bg-card/50 border border-border/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-2">Connected Polkadot Wallet</p>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-xs break-all">{walletAddress}</p>
-                  </div>
-                  <button
-                    onClick={handleCopyWallet}
-                    className="p-2 hover:bg-card rounded transition-colors flex-shrink-0"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-accent" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <Button
-              onClick={() => {
-                setName(profile.name)
-                setPreviewImage(profile.profileImage || "")
-              }}
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              Edit Profile
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
+  const handleViewSettings = () => {
+    onClose()
+    router.push('/dashboard/settings')
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md mx-4 backdrop-blur-xl bg-card/80 border border-border/50 rounded-2xl p-8 shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-card/60 rounded-lg transition-colors">
-          <X className="w-5 h-5" />
-        </button>
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={onClose}
+      />
 
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              {profile?.name ? "Update Profile" : "Create Your Profile"}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-2">Personalize your DOTVEST experience</p>
+      {/* Modal */}
+      <div className="relative w-full max-w-md mx-4 backdrop-blur-xl bg-card/95 border border-border/50 rounded-2xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border/50">
+          <h3 className="text-lg font-semibold">Profile Quick View</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Profile Info */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
+              {profile?.profileImage ? (
+                <img
+                  src={profile.profileImage}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl font-bold text-primary-foreground">
+                  {profile?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}
+                </span>
+              )}
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-lg">
+                {profile?.name || "Anonymous User"}
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                {user?.email || "No email set"}
+              </p>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
-                  {previewImage ? (
-                    <img
-                      src={previewImage || "/placeholder.svg"}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-2xl font-bold text-primary-foreground">
-                      {name ? name.charAt(0).toUpperCase() : "?"}
-                    </span>
-                  )}
-                </div>
-                <label className="absolute bottom-0 right-0 p-2 rounded-full bg-primary hover:bg-primary/90 cursor-pointer transition-colors">
-                  <Camera className="w-4 h-4 text-primary-foreground" />
-                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                </label>
+          {/* Bio */}
+          {profile?.bio && (
+            <div className="p-3 bg-card/50 rounded-lg border border-border/30">
+              <p className="text-sm text-muted-foreground">{profile.bio}</p>
+            </div>
+          )}
+
+          {/* Wallet Info */}
+          {walletAddress && (
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Wallet className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">
+                  Connected Wallet
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground">Click camera icon to upload photo</p>
+              <p className="text-xs font-mono text-foreground break-all">
+                {walletAddress}
+              </p>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Display Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Sparkle"
-                className="w-full px-4 py-3 rounded-lg bg-background/50 border border-border/50 focus:border-primary/50 focus:outline-none transition-colors placeholder:text-muted-foreground/50"
-                autoFocus
-              />
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-card/50 rounded-lg border border-border/30 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Account Type</p>
+              <p className="text-sm font-semibold">
+                {profile?.auth_method === 'wallet' ? 'Wallet' : 'Email'}
+              </p>
             </div>
+            <div className="p-3 bg-card/50 rounded-lg border border-border/30 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Member Since</p>
+              <p className="text-sm font-semibold">
+                {profile?.created_at 
+                  ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  : 'Recently'
+                }
+              </p>
+            </div>
+          </div>
 
+          {/* Action Buttons */}
+          <div className="space-y-2">
             <Button
-              type="submit"
-              disabled={!name.trim() || isSubmitting}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-semibold py-3 rounded-lg transition-all"
+              onClick={handleEditProfile}
+              className="w-full bg-primary hover:bg-primary/90 justify-center"
             >
-              {isSubmitting ? "Saving..." : "Save Profile"}
+              <User className="w-4 h-4 mr-2" />
+              Edit Full Profile
             </Button>
-          </form>
+            
+            <Button
+              onClick={handleViewSettings}
+              variant="outline"
+              className="w-full justify-center"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Account Settings
+            </Button>
+          </div>
         </div>
       </div>
     </div>

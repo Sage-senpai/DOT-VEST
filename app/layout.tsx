@@ -1,19 +1,14 @@
 // FILE: app/layout.tsx
-// ========================================
-import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { Providers } from "./providers"
+import { Inter } from "next/font/google"
 import "./globals.css"
+import { Providers } from "./providers"
 
-const geist = Geist({ subsets: ["latin"] })
-const geistMono = Geist_Mono({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "DOTVEST - Polkadot DeFi Aggregator",
-  description: "Aggregate, optimize, and maximize yields across the Polkadot ecosystem",
-  generator: "v0.app",
+  title: "DotVest - Polkadot DeFi Yield Optimizer",
+  description: "Maximize your yields across the Polkadot ecosystem",
 }
 
 export default function RootLayout({
@@ -22,14 +17,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`font-sans antialiased bg-background text-foreground ${geist.className} ${geistMono.className}`}
-      >
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
         <Providers>
           {children}
         </Providers>
-        <Analytics />
       </body>
     </html>
   )

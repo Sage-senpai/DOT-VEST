@@ -1,22 +1,18 @@
 // FILE: app/(auth)/register/page.tsx
-// ============================================
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Zap, Mail, Lock, User, CheckCircle2, Wallet, Loader2 } from 'lucide-react'
 import { useAuth } from '@/hooks/auth/useAuth'
 import { Button } from '@/components/ui/button'
-import { usePolkadotExtension } from '@/hooks/use-polkadot-extension'
 import styles from './styles.module.css'
 
 export default function RegisterPage() {
   const router = useRouter()
   const { signUp, loading } = useAuth()
-  const { connectWallet, selectedAccount } = usePolkadotExtension()
 
-  const [registrationMode, setRegistrationMode] = useState<'email' | 'wallet'>('email')
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -25,6 +21,15 @@ export default function RegisterPage() {
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [pendingWallet, setPendingWallet] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check if there's a pending wallet from onboarding
+    const pending = localStorage.getItem('pending_wallet_address')
+    if (pending) {
+      setPendingWallet(pending)
+    }
+  }, [])
 
   // === Validation ===
   const validatePassword = (password: string) => {
@@ -51,50 +56,31 @@ export default function RegisterPage() {
       return
     }
 
-    const { error: signUpError } = await signUp(formData.email, formData.password, {
-      full_name: formData.fullName,
-      auth_method: 'email',
-    })
-
-    if (signUpError) {
-      setError(signUpError.message)
-    } else {
-      setSuccess(true)
-      setTimeout(() => router.push('/dashboard'), 2000)
-    }
-  }
-
-  // === Wallet Connect ===
-  const handleWalletConnect = async () => {
     try {
-      await connectWallet()
-    } catch (err) {
-      console.error(err)
-      setError('Failed to connect wallet')
-    }
-  }
+      const { data, error: signUpError } = await signUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        auth_method: 'email',
+        wallet_address: pendingWallet || undefined,
+      })
 
-  // === Wallet Registration ===
-  const handleWalletRegister = async () => {
-    if (!selectedAccount) {
-      setError('Please connect wallet first')
-      return
-    }
-
-    const { error: signUpError } = await signUp(
-      `${selectedAccount.address}@wallet.dotvest.app`, // unique email
-      crypto.randomUUID(), // random password for Supabase
-      {
-        full_name: formData.fullName || 'Wallet User',
-        wallet_address: selectedAccount.address,
-        auth_method: 'wallet',
+      if (signUpError) {
+        setError(signUpError.message)
+        return
       }
-    )
 
-    if (signUpError) {
-      setError(signUpError.message)
-    } else {
-      router.push('/onboarding')
+      if (data?.user) {
+        setSuccess(true)
+        // Redirect back to onboarding if there was a pending wallet
+        setTimeout(() => {
+          if (pendingWallet) {
+            router.push('/onboarding')
+          } else {
+            router.push('/dashboard')
+          }
+        }, 1500)
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during registration')
     }
   }
 
@@ -106,7 +92,12 @@ export default function RegisterPage() {
         <div className={styles.successCard}>
           <CheckCircle2 className={styles.successIcon} />
           <h2 className={styles.successTitle}>Account Created!</h2>
-          <p className={styles.successText}>Redirecting to your dashboard...</p>
+          <p className={styles.successText}>
+            {pendingWallet 
+              ? 'Redirecting to complete your profile...'
+              : 'Redirecting to your dashboard...'
+            }
+          </p>
         </div>
       </div>
     )
@@ -135,166 +126,139 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* === WALLET MODE === */}
-          {registrationMode === 'wallet' ? (
-            <div className="space-y-4">
-              <Button
-                onClick={handleWalletConnect}
-                className="w-full bg-primary hover:bg-primary/90"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Wallet className="w-4 h-4 mr-2" />
-                )}
-                Connect Wallet to Register
-              </Button>
-
-              {selectedAccount && (
-                <>
-                  <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg">
-                    <p className="text-sm font-semibold mb-1">Wallet Connected</p>
-                    <p className="text-xs font-mono break-all">{selectedAccount.address}</p>
-                  </div>
-                  <Button
-                    onClick={handleWalletRegister}
-                    className="w-full bg-primary hover:bg-primary/90"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Wallet className="w-4 h-4 mr-2" />
-                    )}
-                    Register with This Wallet
-                  </Button>
-                </>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => setRegistrationMode('email')}
-                className="w-full bg-transparent"
-              >
-                Use Email Instead
-              </Button>
+          {pendingWallet && (
+            <div className="mb-4 p-4 bg-primary/10 border border-primary/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Wallet className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold">Wallet Connected</p>
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">
+                {pendingWallet.slice(0, 8)}...{pendingWallet.slice(-6)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Creating an account to link with this wallet
+              </p>
             </div>
-          ) : (
-            // === EMAIL MODE ===
-            <form onSubmit={handleSubmit} className={styles.form}>
-              <div className={styles.inputGroup}>
-                <label htmlFor="fullName" className={styles.label}>
-                  Full Name
-                </label>
-                <div className={styles.inputWrapper}>
-                  <User className={styles.inputIcon} />
-                  <input
-                    id="fullName"
-                    type="text"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    placeholder="Davi Sage"
-                    className={styles.input}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label htmlFor="email" className={styles.label}>
-                  Email Address
-                </label>
-                <div className={styles.inputWrapper}>
-                  <Mail className={styles.inputIcon} />
-                  <input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="davisage@example.com"
-                    className={styles.input}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label htmlFor="password" className={styles.label}>
-                  Password
-                </label>
-                <div className={styles.inputWrapper}>
-                  <Lock className={styles.inputIcon} />
-                  <input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                    className={styles.input}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <p className={styles.passwordHint}>
-                  Min 8 characters with uppercase, lowercase, and number
-                </p>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label htmlFor="confirmPassword" className={styles.label}>
-                  Confirm Password
-                </label>
-                <div className={styles.inputWrapper}>
-                  <Lock className={styles.inputIcon} />
-                  <input
-                    id="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(e) =>
-                      setFormData({ ...formData, confirmPassword: e.target.value })
-                    }
-                    placeholder="••••••••"
-                    className={styles.input}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4 mr-2" />
-                )}
-                Create Account
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => setRegistrationMode('wallet')}
-                className="w-full bg-transparent mt-4"
-              >
-                <Wallet className="w-4 h-4 mr-2" />
-                Register with Wallet Instead
-              </Button>
-            </form>
           )}
 
-          <p className={styles.footerText}>
+          <form onSubmit={handleSubmit} className={styles.form}>
+            <div className={styles.inputGroup}>
+              <label htmlFor="fullName" className={styles.label}>
+                Full Name
+              </label>
+              <div className={styles.inputWrapper}>
+                <User className={styles.inputIcon} />
+                <input
+                  id="fullName"
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  placeholder="John Doe"
+                  className={styles.input}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label htmlFor="email" className={styles.label}>
+                Email Address
+              </label>
+              <div className={styles.inputWrapper}>
+                <Mail className={styles.inputIcon} />
+                <input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="you@example.com"
+                  className={styles.input}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label htmlFor="password" className={styles.label}>
+                Password
+              </label>
+              <div className={styles.inputWrapper}>
+                <Lock className={styles.inputIcon} />
+                <input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="••••••••"
+                  className={styles.input}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <p className={styles.passwordHint}>
+                Min 8 characters with uppercase, lowercase, and number
+              </p>
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label htmlFor="confirmPassword" className={styles.label}>
+                Confirm Password
+              </label>
+              <div className={styles.inputWrapper}>
+                <Lock className={styles.inputIcon} />
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({ ...formData, confirmPassword: e.target.value })
+                  }
+                  placeholder="••••••••"
+                  className={styles.input}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Create Account
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className={styles.divider}>
+            <span>or</span>
+          </div>
+
+          <p className={styles.signupPrompt}>
             Already have an account?{' '}
-            <Link href="/login" className={styles.link}>
+            <Link href="/login" className={styles.signupLink}>
               Sign In
             </Link>
           </p>
         </div>
+
+        <p className={styles.footer}>
+          By continuing, you agree to our{' '}
+          <Link href="/terms">Terms of Service</Link> and{' '}
+          <Link href="/privacy">Privacy Policy</Link>
+        </p>
       </div>
     </div>
   )

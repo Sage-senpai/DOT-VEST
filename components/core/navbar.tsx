@@ -1,149 +1,170 @@
 // FILE: components/core/navbar.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Menu, X, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ThemeToggle } from "./theme-toggle"
+import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useAuth } from "@/hooks/auth/useAuth"
-import { useProfile } from "@/hooks/use-profile"
 
 export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user } = useAuth()
   const router = useRouter()
-  const { user, signOut } = useAuth()
-  const { profile } = useProfile()
-  
 
-  const handleSignOut = async () => {
-    await signOut()
-    router.push("/")
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  const handleLaunchApp = () => {
+    if (user) {
+      // User is logged in, go to dashboard
+      router.push('/dashboard')
+    } else {
+      // User is not logged in, go to onboarding
+      router.push('/onboarding')
+    }
   }
 
+  const navLinks = [
+    { href: "#features", label: "Features" },
+    { href: "#chains", label: "Chains" },
+    { href: "#about", label: "About" },
+  ]
+
   return (
-    <nav className="fixed top-0 w-full z-50 backdrop-blur-xl bg-card/40 border border-border/50 border-b">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "backdrop-blur-xl bg-card/80 border-b border-border/50 shadow-lg"
+          : "bg-transparent"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="relative">
-              <Zap className="w-6 h-6 text-primary group-hover:text-accent transition-colors" />
-              <div className="absolute inset-0 bg-primary/20 blur-lg group-hover:bg-accent/20 transition-colors" />
+              <Zap className="w-6 h-6 text-primary group-hover:text-accent transition-colors duration-300" />
+              <div className="absolute inset-0 bg-primary/20 blur-lg group-hover:bg-accent/30 transition-all duration-300" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <span className="font-bold text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               DOTVEST
             </span>
           </Link>
 
-          {/* Desktop Menu */}
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="#chains" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Parachains
-            </Link>
-            <Link href="#analytics" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Analytics
-            </Link>
-            <Link href="#docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Docs
-            </Link>
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
 
-          {/* CTA Buttons */}
+          {/* Right Section */}
           <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
             
             {user ? (
-              <>
-                <Link href="/dashboard">
-                  <Button size="sm" variant="outline">
-                    Dashboard
-                  </Button>
-                </Link>
-                <Button 
-                  size="sm" 
-                  variant="ghost"
-                  onClick={handleSignOut}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  Sign Out
-                </Button>
-              </>
+              <Button
+                onClick={handleLaunchApp}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Go to Dashboard
+              </Button>
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="outline" size="sm">
+                  <Button variant="ghost" className="text-foreground">
                     Sign In
                   </Button>
                 </Link>
-                <Link href="/register">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                    Get Started
-                  </Button>
-                </Link>
+                <Button
+                  onClick={handleLaunchApp}
+                  className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                >
+                  Launch App
+                </Button>
               </>
             )}
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 hover:bg-card rounded-lg transition-colors"
-          >
-            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
-        {isOpen && (
-          <div className="md:hidden pb-4 space-y-2">
-            <Link href="#features" className="block px-4 py-2 text-sm hover:bg-card rounded-lg transition-colors">
-              Features
-            </Link>
-            <Link href="#chains" className="block px-4 py-2 text-sm hover:bg-card rounded-lg transition-colors">
-              Parachains
-            </Link>
-            <Link href="#analytics" className="block px-4 py-2 text-sm hover:bg-card rounded-lg transition-colors">
-              Analytics
-            </Link>
-            <div className="flex items-center gap-2 px-4 pt-2">
-              <ThemeToggle />
-            </div>
-            <div className="flex gap-2 px-4 pt-2">
-              {user ? (
-                <>
-                  <Link href="/dashboard" className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
-                      Dashboard
-                    </Button>
-                  </Link>
-                  <Button 
-                    size="sm" 
-                    variant="ghost"
-                    onClick={handleSignOut}
-                    className="flex-1 text-destructive"
+        {isMobileMenuOpen && (
+          <div className="md:hidden py-4 border-t border-border/50 animate-in slide-in-from-top-2 duration-300">
+            <div className="flex flex-col gap-4">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                >
+                  {link.label}
+                </a>
+              ))}
+              <div className="pt-4 border-t border-border/50 space-y-2">
+                {user ? (
+                  <Button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      handleLaunchApp()
+                    }}
+                    className="w-full bg-primary hover:bg-primary/90"
                   >
-                    Sign Out
+                    Go to Dashboard
                   </Button>
-                </>
-              ) : (
-                <>
-                  <Link href="/login" className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
-                      Sign In
+                ) : (
+                  <>
+                    <Link href="/login" className="block">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false)
+                        handleLaunchApp()
+                      }}
+                      className="w-full bg-gradient-to-r from-primary to-accent"
+                    >
+                      Launch App
                     </Button>
-                  </Link>
-                  <Link href="/register" className="flex-1">
-                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
-                      Start
-                    </Button>
-                  </Link>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
