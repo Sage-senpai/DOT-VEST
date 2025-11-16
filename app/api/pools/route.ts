@@ -1,23 +1,25 @@
-// FILE: app/api/pools/route.ts
+// FILE: app/api/pools/route.ts (FIXED)
+// LOCATION: /app/api/pools/route.ts
 // ============================================
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'  // ← Fixed
 
 export async function GET() {
   try {
-    const supabase = createServerClient()
-    
-    const { data, error } = await supabase
+    const supabase = await createClient()  // ← Fixed
+
+    const { data: pools, error } = await supabase
       .from('pools')
       .select('*')
-      .order('tvl', { ascending: false })
+      .order('apy', { ascending: false })
 
     if (error) throw error
 
-    return NextResponse.json({ data, error: null })
+    return NextResponse.json({ data: pools })
   } catch (error) {
+    console.error('Pools API error:', error)
     return NextResponse.json(
-      { data: null, error: 'Failed to fetch pools' },
+      { error: 'Failed to fetch pools' },
       { status: 500 }
     )
   }

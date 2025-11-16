@@ -1,27 +1,33 @@
-// FILE: app/api/pools/[id]/route.ts
+// FILE: app/api/pools/[id]/route.ts (FIXED)
+// LOCATION: /app/api/pools/[id]/route.ts
 // ============================================
-import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'  // ← Fixed
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createServerClient()
-    
-    const { data, error } = await supabase
+    const supabase = await createClient()  // ← Fixed
+    const { id } = await context.params
+
+    const { data: pool, error } = await supabase
       .from('pools')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) throw error
+    if (!pool) {
+      return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+    }
 
-    return NextResponse.json({ data, error: null })
+    return NextResponse.json({ data: pool })
   } catch (error) {
+    console.error('Pool fetch error:', error)
     return NextResponse.json(
-      { data: null, error: 'Failed to fetch pool' },
+      { error: 'Failed to fetch pool' },
       { status: 500 }
     )
   }

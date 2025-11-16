@@ -12,9 +12,10 @@ export interface ExecutedStrategy {
   protocol: string
   apy: string
   executedAt: Date
-  wallet_address?: string
-  user_id?: string
+  wallet_address?: string | null
+  user_id?: string | null
 }
+
 
 export function useStrategyVaults() {
   const [strategies, setStrategies] = useState<ExecutedStrategy[]>([])

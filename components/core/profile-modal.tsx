@@ -1,4 +1,6 @@
-// FILE: components/core/profile-modal.tsx
+// FILE: components/core/profile-modal.tsx (FIXED)
+// LOCATION: /components/core/profile-modal.tsx
+// ============================================
 "use client"
 
 import { useState, useEffect } from "react"
@@ -13,6 +15,15 @@ interface ProfileModalProps {
   onClose: () => void
   walletAddress?: string
 }
+
+const avatarOptions = [
+  { id: "default-1", emoji: "👤" },
+  { id: "default-2", emoji: "🦸" },
+  { id: "default-3", emoji: "🧑‍🚀" },
+  { id: "default-4", emoji: "🦄" },
+  { id: "default-5", emoji: "🐉" },
+  { id: "default-6", emoji: "🎭" },
+]
 
 export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalProps) {
   const router = useRouter()
@@ -33,15 +44,12 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div className="relative w-full max-w-md mx-4 backdrop-blur-xl bg-card/95 border border-border/50 rounded-2xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50">
           <h3 className="text-lg font-semibold">Profile Quick View</h3>
           <button
@@ -52,9 +60,7 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Profile Info */}
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
               {profile?.profileImage ? (
@@ -65,7 +71,7 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
                 />
               ) : (
                 <span className="text-2xl font-bold text-primary-foreground">
-                  {profile?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}
+                  {(profile?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
@@ -79,14 +85,12 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
             </div>
           </div>
 
-          {/* Bio */}
           {profile?.bio && (
             <div className="p-3 bg-card/50 rounded-lg border border-border/30">
               <p className="text-sm text-muted-foreground">{profile.bio}</p>
             </div>
           )}
 
-          {/* Wallet Info */}
           {walletAddress && (
             <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
@@ -101,7 +105,6 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
             </div>
           )}
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-card/50 rounded-lg border border-border/30 text-center">
               <p className="text-xs text-muted-foreground mb-1">Account Type</p>
@@ -120,7 +123,6 @@ export function ProfileModal({ isOpen, onClose, walletAddress }: ProfileModalPro
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="space-y-2">
             <Button
               onClick={handleEditProfile}

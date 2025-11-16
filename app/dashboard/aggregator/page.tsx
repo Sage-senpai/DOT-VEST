@@ -1,47 +1,38 @@
-// FILE: app/dashboard/aggregator/page.tsx
-"use client"
-
-import { useState, useMemo } from "react"
+// FILE: app/dashboard/aggregator/page.tsx (FIXED)
+// LOCATION: /app/dashboard/aggregator/page.tsx
+// ============================================
+'use client'
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ArrowRightLeft, Zap, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Search, ArrowRightLeft, Zap, AlertCircle, CheckCircle2, TrendingUp, Shield, DollarSign, RefreshCw } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
-import { AIComingSoon } from "@/components/ui/ai-coming-soon"
+import { useLivePools, useOptimalPool, usePoolCategories, LivePool } from "@/hooks/use-live-pools"
 
-const tokenPools = [
-  { name: "DOT POOL", symbol: "DOT", tvl: "$245M", risk: "Low", protocols: ["Bifrost", "Hydration", "Astar"] },
-  { name: "USDC POOL", symbol: "USDC", tvl: "$182M", risk: "Low", protocols: ["Hydration", "Astar", "Moonbeam"] },
-  { name: "USDT POOL", symbol: "USDT", tvl: "$156M", risk: "Low", protocols: ["Acala", "Astar", "Moonbeam"] },
-  { name: "aUSD POOL", symbol: "aUSD", tvl: "$98M", risk: "Low", protocols: ["Acala", "Bifrost"] },
-  { name: "HDX POOL", symbol: "HDX", tvl: "$67M", risk: "Medium", protocols: ["Hydration", "Astar"] },
-  { name: "BNC POOL", symbol: "BNC", tvl: "$43M", risk: "Medium", protocols: ["Bifrost", "Acala"] },
-]
+function LastUpdated({ timestamp }: { timestamp?: string }) {
+  const [time, setTime] = useState('')
 
-const protocolAPYs: { [key: string]: { [key: string]: number } } = {
-  "DOT POOL": { Bifrost: 12.5, Hydration: 14.2, Astar: 11.8 },
-  "USDC POOL": { Hydration: 8.3, Astar: 7.5, Moonbeam: 6.9 },
-  "USDT POOL": { Acala: 9.2, Astar: 8.1, Moonbeam: 7.4 },
-  "aUSD POOL": { Acala: 14.3, Bifrost: 13.1 },
-  "HDX POOL": { Hydration: 18.7, Astar: 16.2 },
-  "BNC POOL": { Bifrost: 15.2, Acala: 14.8 },
+  useEffect(() => {
+    if (timestamp) {
+      setTime(new Date(timestamp).toLocaleTimeString())
+    }
+  }, [timestamp])
+
+  return <p className="text-sm font-semibold">{time}</p>
 }
 
-const calculateReturn = (depositAmount: number, durationMonths: number, apyPercent: number) => {
-  if (!depositAmount || depositAmount <= 0) return 0
-  const apyDecimal = apyPercent / 100
-  const durationYears = durationMonths / 12
-  const totalReturn = depositAmount * (Math.pow(1 + apyDecimal, durationYears) - 1)
-  return totalReturn
-}
-
-export default function Aggregator() {
+export default function RealAggregator() {
   const router = useRouter()
   const { addStrategy } = useStrategyVaults()
   const { selectedAccount, isReady } = usePolkadotExtension()
-  const [selectedToken, setSelectedToken] = useState<number | null>(null)
-  const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null)
+  
+  const { pools, metadata, loading, refresh, isRefreshing } = useLivePools()
+  const { categories } = usePoolCategories()
+  const { findOptimal, isLoading: findingOptimal } = useOptimalPool(pools)
+  
+  const [selectedPool, setSelectedPool] = useState<LivePool | null>(null)
   const [depositAmount, setDepositAmount] = useState("")
   const [durationMonths, setDurationMonths] = useState(1)
   const [isExecuting, setIsExecuting] = useState(false)
@@ -50,50 +41,66 @@ export default function Aggregator() {
     message: ''
   })
   const [searchQuery, setSearchQuery] = useState("")
-  const [showAISection, setShowAISection] = useState(false)
-
-  const currentTokenPool = selectedToken !== null ? tokenPools[selectedToken] : null
-  const availableProtocols = currentTokenPool?.protocols || []
+  const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all')
 
   const filteredPools = useMemo(() => {
-    if (!searchQuery) return tokenPools
-    return tokenPools.filter(pool => 
-      pool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pool.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+    let filtered = pools
+
+    filtered = filtered.filter(pool =>
+      pool.project?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pool.chain?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pool.symbol?.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [searchQuery])
+
+    if (riskFilter !== 'all') {
+      filtered = filtered.filter(pool => {
+        if (riskFilter === 'low') return pool.riskScore >= 70
+        if (riskFilter === 'medium') return pool.riskScore >= 40 && pool.riskScore < 70
+        return pool.riskScore < 40
+      })
+    }
+
+    return filtered
+  }, [pools, searchQuery, riskFilter])
 
   const estimatedReturn = useMemo(() => {
-    if (selectedToken === null || !selectedProtocol) return 0
-    const poolName = tokenPools[selectedToken].name
-    const apy = protocolAPYs[poolName]?.[selectedProtocol] || 0
-    const amount = Number.parseFloat(depositAmount) || 0
-    return calculateReturn(amount, durationMonths, apy)
-  }, [selectedToken, selectedProtocol, depositAmount, durationMonths])
+    if (!selectedPool || !depositAmount) return 0
+    const amount = parseFloat(depositAmount)
+    const monthlyRate = selectedPool.apy / 100 / 12
+    const total = amount * Math.pow(1 + monthlyRate, durationMonths)
+    return total - amount
+  }, [selectedPool, depositAmount, durationMonths])
 
-  const handleDurationChange = (duration: string) => {
-    const monthMap: { [key: string]: number } = {
-      "1 Month": 1,
-      "3 Months": 3,
-      "6 Months": 6,
-      "1 Year": 12,
+  const handleFindOptimal = async () => {
+    if (!depositAmount || !isReady) return
+
+    try {
+      const result = await findOptimal({
+        amount: parseFloat(depositAmount),
+        duration: durationMonths,
+        riskTolerance: riskFilter === 'all' ? 'medium' : riskFilter,
+      })
+
+      if (result.success && result.data) {
+        setSelectedPool(result.data.pool)
+        setExecutionStatus({
+          type: 'success',
+          message: `Found optimal pool: ${result.data.name} with ${result.data.pool.apy}% APY`
+        })
+      }
+    } catch (error: any) {
+      setExecutionStatus({
+        type: 'error',
+        message: error.message || 'Failed to find optimal pool'
+      })
     }
-    setDurationMonths(monthMap[duration] || 1)
   }
 
   const handleExecuteStrategy = async () => {
-    if (!selectedToken || !selectedProtocol || !depositAmount) {
+    if (!selectedPool || !depositAmount || !selectedAccount) {
       setExecutionStatus({
         type: 'error',
-        message: 'Please select a pool, protocol, and enter an amount'
-      })
-      return
-    }
-
-    if (!isReady) {
-      setExecutionStatus({
-        type: 'error',
-        message: 'Please connect your Polkadot wallet first'
+        message: 'Please select a pool and enter an amount'
       })
       return
     }
@@ -102,27 +109,26 @@ export default function Aggregator() {
     setExecutionStatus({type: 'idle', message: ''})
 
     try {
-      // Simulate blockchain transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
       const strategy = {
         id: Date.now().toString(),
-        tokenName: tokenPools[selectedToken].name,
-        amount: Number.parseFloat(depositAmount),
+        tokenName: selectedPool.symbol,
+        amount: parseFloat(depositAmount),
         duration: durationMonths,
-        protocol: selectedProtocol,
-        apy: protocolAPYs[tokenPools[selectedToken].name][selectedProtocol].toString(),
-        executedAt: new Date().toISOString(),
+        protocol: selectedPool.project,
+        apy: selectedPool.apy.toString(),
+        executedAt: new Date(),
+        wallet_address: selectedAccount.address
       }
 
       addStrategy(strategy)
 
       setExecutionStatus({
         type: 'success',
-        message: `Successfully deployed strategy to ${selectedProtocol}! Redirecting to vaults...`
+        message: `Successfully deployed ${depositAmount} ${selectedPool.symbol} to ${selectedPool.project}`
       })
 
-      // Redirect after showing success message
       setTimeout(() => {
         router.push("/dashboard/vaults")
       }, 2000)
@@ -131,30 +137,90 @@ export default function Aggregator() {
         type: 'error',
         message: 'Strategy execution failed. Please try again.'
       })
+    } finally {
       setIsExecuting(false)
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading live DeFi opportunities...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">POOL AGGREGATOR</h2>
-        <p className="text-muted-foreground">Select a token pool and optimize your yield strategy</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold mb-2">DeFi Aggregator</h2>
+          <p className="text-muted-foreground">
+            Real-time opportunities from {metadata.chains?.length || 0} Polkadot parachains
+          </p>
+        </div>
+        <Button
+          onClick={refresh}
+          disabled={isRefreshing}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </Button>
       </div>
 
-      {/* Wallet Connection Alert */}
-      {!isReady && (
-        <Card className="backdrop-blur-xl bg-destructive/10 border border-destructive/50 p-4 rounded-lg">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive" />
-            <p className="text-sm text-destructive">
-              Please connect your Polkadot wallet to execute strategies
-            </p>
+      {/* Live Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Total Pools</p>
+              <p className="text-2xl font-bold">{metadata.total || 0}</p>
+            </div>
+            <TrendingUp className="w-8 h-8 text-primary opacity-50" />
           </div>
         </Card>
-      )}
 
-      {/* Execution Status */}
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Avg APY</p>
+              <p className="text-2xl font-bold text-accent">
+                {metadata.avgAPY?.toFixed(2) || 0}%
+              </p>
+            </div>
+            <Zap className="w-8 h-8 text-accent opacity-50" />
+          </div>
+        </Card>
+
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Total TVL</p>
+              <p className="text-2xl font-bold">
+                ${((metadata.totalTVL || 0) / 1e6).toFixed(1)}M
+              </p>
+            </div>
+            <DollarSign className="w-8 h-8 text-secondary opacity-50" />
+          </div>
+        </Card>
+
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Last Updated</p>
+              <LastUpdated timestamp={metadata.lastUpdated || undefined} />
+            </div>
+            <RefreshCw className="w-8 h-8 text-muted-foreground opacity-50" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Status Messages */}
       {executionStatus.type !== 'idle' && (
         <Card className={`backdrop-blur-xl border p-4 rounded-lg ${
           executionStatus.type === 'success' 
@@ -176,149 +242,170 @@ export default function Aggregator() {
         </Card>
       )}
 
-      {/* Search & Filter */}
+      {/* Search & Filters */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-        <div className="flex gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search tokens..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-            />
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search pools, protocols, or tokens..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <Button 
+              onClick={handleFindOptimal}
+              disabled={findingOptimal || !depositAmount}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              {findingOptimal ? 'Finding...' : 'Find Optimal'}
+            </Button>
           </div>
-          <Button 
-            className="bg-primary hover:bg-primary/90"
-            onClick={() => setShowAISection(!showAISection)}
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            AI Recommendation
-          </Button>
-        </div>
 
-        <div className="space-y-3">
-          {filteredPools.map((pool, idx) => {
-            const originalIdx = tokenPools.findIndex(p => p.name === pool.name)
-            return (
-              <div
-                key={originalIdx}
-                onClick={() => {
-                  setSelectedToken(originalIdx)
-                  setSelectedProtocol(null)
-                  setDepositAmount("")
-                  setExecutionStatus({type: 'idle', message: ''})
-                }}
-                className={`p-4 rounded-lg cursor-pointer transition-all border flex items-center justify-between ${
-                  selectedToken === originalIdx
-                    ? "bg-primary/20 border-primary backdrop-blur-xl"
-                    : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
+          <div className="flex gap-2">
+            {['all', 'low', 'medium', 'high'].map((risk) => (
+              <button
+                key={risk}
+                onClick={() => setRiskFilter(risk as any)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  riskFilter === risk
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card/50 hover:bg-card/80'
                 }`}
               >
-                <div className="flex items-center gap-6 flex-1">
-                  <div className="min-w-fit">
-                    <h4 className="font-semibold text-base">{pool.name}</h4>
-                    <p className="text-xs text-muted-foreground">{pool.symbol}</p>
+                {risk === 'all' ? 'All Risks' : `${risk.charAt(0).toUpperCase() + risk.slice(1)} Risk`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {filteredPools.map((pool, idx) => (
+            <div
+              key={`${pool.chain}-${pool.project}-${idx}`}
+              onClick={() => setSelectedPool(pool)}
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                selectedPool?.symbol === pool.symbol && selectedPool?.chain === pool.chain
+                  ? "bg-primary/20 border-primary backdrop-blur-xl"
+                  : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <h4 className="font-semibold text-base">{pool.symbol} {pool.project}</h4>
+                    <span className="text-xs px-2 py-1 rounded bg-secondary/20 text-secondary">
+                      {pool.chain}
+                    </span>
+                    <Shield className="w-4 h-4 text-accent" />
                   </div>
-                  <div className="flex items-center gap-8 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide">TVL</span>
-                      <span className="font-semibold text-sm">{pool.tvl}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide">RISK</span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded font-medium ${
-                          pool.risk === "Low" ? "bg-accent/20 text-accent" : "bg-secondary/20 text-secondary"
-                        }`}
-                      >
-                        {pool.risk}
-                      </span>
-                    </div>
+                  <p className="text-xs text-muted-foreground mt-1">{pool.project}</p>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">APY</p>
+                    <p className="text-xl font-bold text-accent">{pool.apy.toFixed(2)}%</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">TVL</p>
+                    <p className="text-sm font-semibold">
+                      ${(pool.tvlUsd / 1e6).toFixed(2)}M
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Risk Score</p>
+                    <p className={`text-sm font-bold ${
+                      pool.riskScore >= 70 ? 'text-accent' :
+                      pool.riskScore >= 40 ? 'text-secondary' : 'text-destructive'
+                    }`}>
+                      {pool.riskScore}/100
+                    </p>
                   </div>
                 </div>
-                <ArrowRightLeft className="w-5 h-5 text-muted-foreground" />
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       </Card>
 
-      {/* AI Section */}
-      {showAISection && (
-        <AIComingSoon />
-      )}
+      {/* Strategy Builder */}
+      {selectedPool && (
+        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg">
+          <h3 className="text-2xl font-bold mb-6">Build Your Strategy</h3>
 
-      {selectedToken !== null && (
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Build Your Strategy</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Strategy Pool (Protocol)</label>
-              <select
-                value={selectedProtocol || ""}
-                onChange={(e) => setSelectedProtocol(e.target.value)}
-                className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-              >
-                <option value="">Select a protocol...</option>
-                {availableProtocols.map((protocol) => (
-                  <option key={protocol} value={protocol}>
-                    {protocol} - {protocolAPYs[tokenPools[selectedToken].name][protocol]}% APY
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Amount to Deposit</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                  />
+                  <span className="px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm">
+                    {selectedPool.symbol}
+                  </span>
+                </div>
+              </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Amount to Deposit</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
-                />
-                <select className="px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50">
-                  <option>{tokenPools[selectedToken].symbol}</option>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Duration</label>
+                <select
+                  value={durationMonths}
+                  onChange={(e) => setDurationMonths(Number(e.target.value))}
+                  className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                >
+                  <option value={1}>1 Month</option>
+                  <option value={3}>3 Months</option>
+                  <option value={6}>6 Months</option>
+                  <option value={12}>1 Year</option>
                 </select>
               </div>
-            </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Strategy Duration</label>
-              <select
-                onChange={(e) => handleDurationChange(e.target.value)}
-                className="w-full px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+              <Button
+                onClick={handleExecuteStrategy}
+                disabled={!isReady || isExecuting || !depositAmount}
+                className="w-full bg-primary hover:bg-primary/90 gap-2 disabled:opacity-50"
               >
-                <option>1 Month</option>
-                <option>3 Months</option>
-                <option>6 Months</option>
-                <option>1 Year</option>
-              </select>
+                <ArrowRightLeft className="w-4 h-4" />
+                {isExecuting ? "Executing..." : "Execute Strategy"}
+              </Button>
             </div>
 
-            <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
-              <p className="text-sm mb-2">
-                <span className="font-semibold">Estimated Return:</span>{" "}
-                <span className="text-primary font-bold">${estimatedReturn.toFixed(2)}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {depositAmount && selectedProtocol
-                  ? `Based on ${protocolAPYs[tokenPools[selectedToken].name][selectedProtocol]}% APY over ${durationMonths} month${durationMonths !== 1 ? "s" : ""}`
-                  : "Select protocol and enter amount to calculate"}
-              </p>
+            <div className="space-y-4">
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Selected Pool</span>
+                  <span className="font-semibold">{selectedPool.symbol} {selectedPool.project}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">APY</span>
+                  <span className="font-semibold text-accent">{selectedPool.apy}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Estimated Return</span>
+                  <span className="font-bold text-accent">
+                    {estimatedReturn.toFixed(2)} {selectedPool.symbol}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Risk Score</span>
+                  <span className={`font-bold ${
+                    selectedPool.riskScore >= 70 ? 'text-accent' : 'text-secondary'
+                  }`}>
+                    {selectedPool.riskScore}/100
+                  </span>
+                </div>
+              </div>
             </div>
-
-            <Button
-              onClick={handleExecuteStrategy}
-              disabled={!selectedProtocol || !depositAmount || isExecuting || !isReady}
-              className="w-full bg-primary hover:bg-primary/90 gap-2 disabled:opacity-50"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              {isExecuting ? "Executing..." : "Execute Strategy"}
-            </Button>
           </div>
         </Card>
       )}

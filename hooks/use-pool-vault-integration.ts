@@ -1,4 +1,6 @@
-// FILE: hooks/use-pool-vault-integration.ts
+// FILE: hooks/use-pool-vault-integration.ts (FIXED)
+// LOCATION: /hooks/use-pool-vault-integration.ts
+// ============================================
 "use client"
 
 import { useState, useCallback } from 'react'
@@ -72,7 +74,7 @@ export function usePoolVaultIntegration() {
       // Simulate blockchain transaction delay
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Add strategy to vault system
+      // Add strategy to vault system with Date object
       const strategy = {
         id: Date.now().toString(),
         tokenName: poolStrategy.poolName,
@@ -80,7 +82,8 @@ export function usePoolVaultIntegration() {
         duration: poolStrategy.duration,
         protocol: poolStrategy.protocol,
         apy: poolStrategy.apy,
-        executedAt: new Date().toISOString(),
+        executedAt: new Date(),  // ← Changed to Date object
+        wallet_address: selectedAccount.address,
       }
 
       addStrategy(strategy)

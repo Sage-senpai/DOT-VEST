@@ -1,4 +1,6 @@
-// FILE: app/dashboard/profile/page.tsx
+// FILE: app/dashboard/profile/page.tsx (FIXED)
+// LOCATION: /app/dashboard/profile/page.tsx
+// ============================================
 "use client"
 
 import { useState, useEffect } from "react"
@@ -47,15 +49,19 @@ export default function Profile() {
     }
   }
 
-  // Calculate user statistics
   const totalStrategies = strategies.length
   const totalDeposited = strategies.reduce((sum, s) => sum + s.amount, 0)
   const avgAPY = strategies.length > 0
     ? strategies.reduce((sum, s) => sum + parseFloat(s.apy), 0) / strategies.length
     : 0
 
-  const memberSince = profile?.createdAt 
-    ? new Date(profile.createdAt).toLocaleDateString('en-US', { 
+  const totalEarned = strategies.reduce((sum, s) => {
+    const monthsElapsed = s.duration ? Math.min(s.duration, 6) : 1
+    return sum + (s.amount * parseFloat(s.apy) / 100 * monthsElapsed / 12)
+  }, 0)
+
+  const memberSince = profile?.created_at 
+    ? new Date(profile.created_at).toLocaleDateString('en-US', { 
         month: 'long', 
         year: 'numeric' 
       })
@@ -68,10 +74,8 @@ export default function Profile() {
         <p className="text-muted-foreground">Manage your account and view your DeFi journey</p>
       </div>
 
-      {/* Profile Header */}
       <Card className="backdrop-blur-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-8 rounded-lg">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-          {/* Profile Picture */}
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
               {profile?.profileImage ? (
@@ -82,7 +86,7 @@ export default function Profile() {
                 />
               ) : (
                 <span className="text-4xl font-bold text-primary-foreground">
-                  {profile?.name?.charAt(0).toUpperCase() || "?"}
+                  {(profile?.name || 'U').charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
@@ -91,7 +95,6 @@ export default function Profile() {
             </button>
           </div>
 
-          {/* Profile Info */}
           <div className="flex-1">
             {editing ? (
               <div className="space-y-3">
@@ -163,7 +166,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-accent">{totalStrategies}</p>
@@ -177,7 +179,6 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* Wallet Information */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <Wallet className="w-5 h-5 text-primary" />
@@ -186,12 +187,11 @@ export default function Profile() {
 
         {selectedAccount ? (
           <div className="space-y-4">
-            {/* Primary Wallet */}
             <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Primary Account</p>
-                  <p className="font-semibold">{selectedAccount.name || "Unnamed Account"}</p>
+                  <p className="font-semibold">{selectedAccount.meta?.name || "Unnamed Account"}</p>
                 </div>
                 <button
                   onClick={handleCopyAddress}
@@ -210,7 +210,6 @@ export default function Profile() {
               </p>
             </div>
 
-            {/* Balance Overview */}
             {balancesLoading ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Loading balances...</p>
@@ -230,28 +229,28 @@ export default function Profile() {
               </div>
             )}
 
-            {/* Chain Balances */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Balances by Chain</p>
-              {balances.map((chainBalance) => (
-                <div
-                  key={chainBalance.chain}
-                  className="p-3 rounded-lg bg-card/50 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{chainBalance.chain}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {chainBalance.tokens.map(t => t.formatted).join(", ")}
+            {balances.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Balances by Chain</p>
+                {balances.map((chainBalance) => (
+                  <div
+                    key={chainBalance.chain}
+                    className="p-3 rounded-lg bg-card/50 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{chainBalance.chain}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {chainBalance.tokens.map(t => t.formatted).join(", ")}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-accent">
+                      ${chainBalance.totalUsdValue.toFixed(2)}
                     </p>
                   </div>
-                  <p className="font-semibold text-accent">
-                    ${chainBalance.totalUsdValue.toFixed(2)}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
-            {/* Other Accounts */}
             {accounts && accounts.length > 1 && (
               <div className="pt-4 border-t border-border/50">
                 <p className="text-sm font-medium mb-3">Other Accounts</p>
@@ -264,7 +263,7 @@ export default function Profile() {
                         className="p-3 rounded-lg bg-card/50 flex items-center justify-between"
                       >
                         <div>
-                          <p className="font-medium text-sm">{account.name || "Unnamed"}</p>
+                          <p className="font-medium text-sm">{account.meta?.name || "Unnamed"}</p>
                           <p className="text-xs text-muted-foreground font-mono">
                             {account.address.slice(0, 10)}...{account.address.slice(-8)}
                           </p>
@@ -287,7 +286,6 @@ export default function Profile() {
         )}
       </Card>
 
-      {/* Activity Summary */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <TrendingUp className="w-5 h-5 text-accent" />
@@ -301,44 +299,45 @@ export default function Profile() {
             <p className="text-xs text-muted-foreground mt-1">Across all vaults</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground mb-2">Active Strategies</p>
-            <p className="text-3xl font-bold text-primary">{totalStrategies}</p>
-            <p className="text-xs text-muted-foreground mt-1">Currently running</p>
+            <p className="text-sm text-muted-foreground mb-2">Total Earned</p>
+            <p className="text-3xl font-bold text-accent">${totalEarned.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-1">To date</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-2">Average APY</p>
-            <p className="text-3xl font-bold text-accent">{avgAPY.toFixed(1)}%</p>
+            <p className="text-3xl font-bold text-primary">{avgAPY.toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground mt-1">Portfolio average</p>
           </div>
         </div>
 
-        {/* Recent Strategies */}
         {strategies.length > 0 && (
           <div className="mt-6 pt-6 border-t border-border/50">
             <p className="text-sm font-medium mb-3">Recent Strategies</p>
             <div className="space-y-2">
-              {strategies.slice(0, 3).map((strategy) => (
-                <div
-                  key={strategy.id}
-                  className="p-3 rounded-lg bg-card/50 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-medium text-sm">
-                      {strategy.tokenName} via {strategy.protocol}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {strategy.amount} tokens • {strategy.duration} months
-                    </p>
+              {strategies
+                .sort((a, b) => new Date(b.executedAt || 0).getTime() - new Date(a.executedAt || 0).getTime())
+                .slice(0, 3)
+                .map((strategy) => (
+                  <div
+                    key={strategy.id}
+                    className="p-3 rounded-lg bg-card/50 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">
+                        {strategy.tokenName} via {strategy.protocol}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        ${strategy.amount.toFixed(2)} • {strategy.duration} months
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-accent">{strategy.apy}% APY</span>
                   </div>
-                  <span className="text-sm font-semibold text-accent">{strategy.apy}% APY</span>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         )}
       </Card>
 
-      {/* Achievements (Future Feature) */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <Award className="w-5 h-5 text-secondary" />
@@ -347,21 +346,26 @@ export default function Profile() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { name: "First Stake", earned: true, icon: "🎯" },
-            { name: "Early Adopter", earned: true, icon: "🌟" },
+            { name: "First Stake", earned: totalStrategies >= 1, icon: "🎯" },
+            { name: "Early Adopter", earned: profile?.created_at ? true : false, icon: "🌟" },
             { name: "Yield Master", earned: totalStrategies >= 5, icon: "💎" },
             { name: "Diversified", earned: balances.length >= 3, icon: "🌈" },
+            { name: "Big Player", earned: totalDeposited >= 1000, icon: "🐋" },
+            { name: "Consistent", earned: totalStrategies >= 3 && avgAPY > 10, icon: "⭐" },
           ].map((achievement) => (
             <div
               key={achievement.name}
               className={`p-4 rounded-lg text-center transition-all ${
                 achievement.earned
                   ? "bg-primary/10 border border-primary/30"
-                  : "bg-card/50 border border-border/50 opacity-50"
+                  : "bg-card/50 border border-border/50 opacity-50 grayscale"
               }`}
             >
               <span className="text-3xl mb-2 block">{achievement.icon}</span>
               <p className="text-xs font-medium">{achievement.name}</p>
+              {!achievement.earned && (
+                <p className="text-xs text-muted-foreground mt-1">Locked</p>
+              )}
             </div>
           ))}
         </div>

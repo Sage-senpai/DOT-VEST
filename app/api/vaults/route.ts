@@ -1,14 +1,16 @@
 // FILE: app/api/vaults/route.ts
-// ============================================
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   try {
-    const supabase = createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const supabase = await createClient()
 
-    if (!session) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
         *,
         pool:pools(*)
       `)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -37,10 +39,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const supabase = await createClient()
 
-    if (!session) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
       .from('vaults')
       .insert({
         ...body,
-        user_id: session.user.id,
+        user_id: user.id,
       })
       .select()
       .single()

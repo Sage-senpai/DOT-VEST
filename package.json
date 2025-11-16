@@ -5,8 +5,14 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+     "check": "tsc --noEmit",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "verify-data": "tsx scripts/verify-data.ts",
+    "test:api": "curl http://localhost:3000/api/pools/live",
+    "test:optimal": "curl -X POST http://localhost:3000/api/pools/live/optimal -H 'Content-Type: application/json' -d '{\"amount\":1000,\"duration\":6,\"riskTolerance\":\"medium\"}'",
+    "cache:clear": "rm -rf .next/cache",
+    "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -45,6 +51,7 @@
     "@radix-ui/react-toggle": "1.1.1",
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
+    "@sentry/nextjs": "^10.25.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.81.1",

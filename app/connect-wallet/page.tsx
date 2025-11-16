@@ -77,8 +77,9 @@ export default function ConnectWallet() {
   }
 
   const handleSelectAccount = (address: string) => {
-    selectAccount(address)
-  }
+  const account = accounts.find(a => a.address === address)
+  if (account) selectAccount(account) // ✅ pass full object
+}
 
   const handleContinue = () => {
     if (selectedAccount) {
@@ -212,11 +213,11 @@ export default function ConnectWallet() {
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                             <span className="text-sm font-bold text-primary-foreground">
-                              {account.name?.charAt(0).toUpperCase() || "?"}
+                              {account.meta.name?.charAt(0).toUpperCase() || "?"}
                             </span>
                           </div>
                           <div>
-                            <p className="font-semibold">{account.name || "Unnamed Account"}</p>
+                            <p className="font-semibold">{account.meta.name || "Unnamed Account"}</p>
                             <p className="text-xs text-muted-foreground font-mono">
                               {account.address.slice(0, 10)}...{account.address.slice(-8)}
                             </p>

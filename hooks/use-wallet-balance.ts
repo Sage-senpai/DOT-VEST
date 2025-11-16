@@ -1,4 +1,6 @@
-// FILE: hooks/use-wallet-balance.ts
+// FILE: hooks/use-wallet-balance.ts (FIXED)
+// LOCATION: /hooks/use-wallet-balance.ts
+// ============================================
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,7 +24,16 @@ export interface ChainBalance {
   totalUsdValue: number
 }
 
-const CHAIN_CONFIGS = {
+interface ChainConfig {
+  name: string
+  rpcUrl: string
+  symbol: string
+  decimals: number
+}
+
+type ChainKey = 'polkadot' | 'acala' | 'hydration' | 'bifrost'
+
+const CHAIN_CONFIGS: Record<ChainKey, ChainConfig> = {
   polkadot: {
     name: 'Polkadot',
     rpcUrl: process.env.NEXT_PUBLIC_POLKADOT_RPC_URL || 'wss://rpc.polkadot.io',
@@ -49,6 +60,17 @@ const CHAIN_CONFIGS = {
   },
 }
 
+type MockPrices = {
+  [key: string]: number
+}
+
+const mockPrices: MockPrices = {
+  DOT: 7.5,
+  ACA: 0.08,
+  HDX: 0.02,
+  BNC: 0.5,
+}
+
 export function useWalletBalance() {
   const { selectedAccount, isReady } = usePolkadotExtension()
   const [balances, setBalances] = useState<ChainBalance[]>([])
@@ -57,7 +79,7 @@ export function useWalletBalance() {
   const [totalPortfolioValue, setTotalPortfolioValue] = useState(0)
 
   const fetchChainBalance = useCallback(async (
-    chainKey: string,
+    chainKey: ChainKey,
     address: string
   ): Promise<ChainBalance | null> => {
     const config = CHAIN_CONFIGS[chainKey]
@@ -67,8 +89,9 @@ export function useWalletBalance() {
       const provider = new WsProvider(config.rpcUrl)
       const api = await ApiPromise.create({ provider })
 
-      // Get account data
-      const { data: balance } = await api.query.system.account(address)
+      // Get account data with proper typing
+      const accountInfo: any = await api.query.system.account(address)
+      const balance = accountInfo.data
       
       // Format balance
       formatBalance.setDefaults({ 
@@ -82,15 +105,10 @@ export function useWalletBalance() {
         decimals: config.decimals 
       })
 
-      // Calculate USD value (mock for now, integrate with price API later)
-      const mockPrices = {
-        DOT: 7.5,
-        ACA: 0.08,
-        HDX: 0.02,
-        BNC: 0.5,
-      }
+      // Calculate USD value
       const balanceNumber = Number(free) / Math.pow(10, config.decimals)
-      const usdValue = balanceNumber * (mockPrices[config.symbol] || 0)
+      const price = mockPrices[config.symbol] || 0
+      const usdValue = balanceNumber * price
 
       await api.disconnect()
 
@@ -124,7 +142,7 @@ export function useWalletBalance() {
     setError(null)
 
     try {
-      const chainKeys = Object.keys(CHAIN_CONFIGS)
+      const chainKeys: ChainKey[] = ['polkadot', 'acala', 'hydration', 'bifrost']
       const balancePromises = chainKeys.map(key => 
         fetchChainBalance(key, selectedAccount.address)
       )

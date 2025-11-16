@@ -5,6 +5,7 @@ import { Hero } from "@/components/landing/hero"
 import { Features } from "@/components/landing/features"
 import { Chains } from "@/components/landing/chains"
 import { CTA } from "@/components/landing/cta"
+import OptimalPoolForm from "@/components/OptimalPoolForm"
 
 export default function Home() {
   return (
@@ -13,6 +14,7 @@ export default function Home() {
       <Hero />
       <Features />
       <Chains />
+      <OptimalPoolForm /> 
       <CTA />
       <Footer />
     </main>

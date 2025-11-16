@@ -1,42 +1,69 @@
-// FILE: app/api/strategies/[id]/route.ts
+// FILE: app/api/strategies/[id]/route.ts (FIXED)
+// LOCATION: /app/api/strategies/[id]/route.ts
 // ============================================
-import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'  // ← Fixed
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const supabase = await createClient()  // ← Fixed
+    const body = await request.json()
+    const { id } = await context.params
 
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-
-    const { data, error } = await supabase
+    const { data: strategy, error } = await supabase
       .from('strategies')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', params.id)
-      .eq('user_id', session.user.id)
+      .update(body)
+      .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
     if (error) throw error
 
-    return NextResponse.json({ data, error: null })
+    return NextResponse.json({ data: strategy })
   } catch (error) {
+    console.error('Strategy update error:', error)
     return NextResponse.json(
-      { data: null, error: 'Failed to update strategy' },
+      { error: 'Failed to update strategy' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient()  // ← Fixed
+    const { id } = await context.params
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { error } = await supabase
+      .from('strategies')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Strategy delete error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete strategy' },
       { status: 500 }
     )
   }

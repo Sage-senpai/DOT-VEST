@@ -1,4 +1,6 @@
-// FILE: app/dashboard/layout.tsx
+// FILE: app/dashboard/layout.tsx (FIXED)
+// LOCATION: /app/dashboard/layout.tsx
+// ============================================
 "use client"
 
 import type React from "react"
@@ -63,7 +65,6 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Backdrop overlay for mobile */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
@@ -71,7 +72,6 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* Sidebar */}
       <aside
         onMouseEnter={() => setSidebarHovered(true)}
         onMouseLeave={() => setSidebarHovered(false)}
@@ -83,7 +83,6 @@ export default function DashboardLayout({
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        {/* Logo & Toggle */}
         <div className={cn(
           "h-16 flex items-center border-b border-border/50 px-4 transition-all duration-300",
           showSidebar ? "justify-between" : "justify-center"
@@ -110,7 +109,6 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -129,12 +127,10 @@ export default function DashboardLayout({
                   !showSidebar && "justify-center"
                 )}
               >
-                {/* Active indicator */}
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-lg shadow-primary/50" />
                 )}
                 
-                {/* Icon with animation */}
                 <div className={cn(
                   "relative transition-all duration-300",
                   "group-hover:scale-110 group-hover:rotate-3",
@@ -142,19 +138,17 @@ export default function DashboardLayout({
                   isActive && "animate-pulse"
                 )}>
                   <Icon className={cn(
-                    "w-5 h-5 flex-shrink-0 transition-all duration-300",
+                    "w-5 h-5 shrink-0 transition-all duration-300",
                     isActive && "drop-shadow-[0_0_8px_rgba(230,0,122,0.5)]"
                   )} />
                 </div>
 
-                {/* Label with slide animation */}
                 {showSidebar && (
                   <span className="animate-in fade-in slide-in-from-left-2 duration-300">
                     {item.label}
                   </span>
                 )}
 
-                {/* Hover chevron */}
                 {!showSidebar && (
                   <ChevronRight className={cn(
                     "absolute right-0 w-4 h-4 opacity-0 -translate-x-2",
@@ -166,7 +160,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Logout */}
         <div className={cn(
           "p-4 border-t border-border/50",
           !showSidebar && "flex justify-center"
@@ -190,11 +183,8 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto flex flex-col">
-        {/* Top Bar */}
         <div className="h-16 backdrop-blur-xl bg-card/95 dark:bg-card/80 border-b border-border dark:border-border/70 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20">
-          {/* Page Title */}
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)} 
@@ -207,15 +197,10 @@ export default function DashboardLayout({
             </h1>
           </div>
 
-          {/* Right side actions */}
           <div className="flex items-center gap-3">
-            {/* Enhanced Wallet Manager */}
             <WalletManager />
-
-            {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Profile Button */}
             {mounted && (
               <button
                 onClick={() => setProfileModalOpen(true)}
@@ -237,7 +222,7 @@ export default function DashboardLayout({
                     />
                   ) : (
                     <span className="text-xs font-bold text-primary-foreground">
-                      {profile.name.charAt(0).toUpperCase()}
+                      {(profile.name || 'U').charAt(0).toUpperCase()}
                     </span>
                   )
                 ) : (
@@ -248,7 +233,6 @@ export default function DashboardLayout({
           </div>
         </div>
 
-        {/* Page Content */}
         <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           {children}
         </div>

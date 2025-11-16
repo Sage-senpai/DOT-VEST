@@ -26,10 +26,17 @@ export const analyticsQueries = {
 
     if (vaultsError) return { data: null, error: vaultsError }
 
-    const totalDeposited = vaults.reduce((sum, v) => 
-      sum + parseFloat(v.deposited_amount.toString()), 0)
-    const totalEarned = vaults.reduce((sum, v) => 
-      sum + parseFloat(v.earned_amount.toString()), 0)
+const totalDeposited = vaults.reduce(
+  (sum: number, v: { deposited_amount: number | string }) =>
+    sum + parseFloat(v.deposited_amount.toString()),
+  0
+)
+
+const totalEarned = vaults.reduce(
+  (sum: number, v: { earned_amount: number | string }) =>
+    sum + parseFloat(v.earned_amount.toString()),
+  0
+)
 
     return {
       data: {

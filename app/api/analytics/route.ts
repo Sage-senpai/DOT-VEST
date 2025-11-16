@@ -1,39 +1,32 @@
-// FILE: app/api/analytics/route.ts
+// FILE: app/api/analytics/route.ts (FIXED)
+// LOCATION: /app/api/analytics/route.ts
 // ============================================
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'  // ← Fixed
 
 export async function GET(request: Request) {
   try {
-    const supabase = createServerClient()
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const supabase = await createClient()  // ← Fixed
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '7')
-
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-
-    const { data, error } = await supabase
-      .from('analytics')
+    const { data: strategies, error } = await supabase
+      .from('strategies')
       .select('*')
-      .eq('user_id', session.user.id)
-      .gte('date', startDate.toISOString().split('T')[0])
-      .order('date', { ascending: true })
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    return NextResponse.json({ data, error: null })
+    return NextResponse.json({ data: strategies })
   } catch (error) {
+    console.error('Analytics API error:', error)
     return NextResponse.json(
-      { data: null, error: 'Failed to fetch analytics' },
+      { error: 'Failed to fetch analytics data' },
       { status: 500 }
     )
   }
