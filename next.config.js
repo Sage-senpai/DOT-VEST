@@ -4,17 +4,16 @@ const { withSentryConfig } = require('@sentry/nextjs')
 const nextConfig = {
   reactStrictMode: true,
 
-  // App Router is enabled
+  // Remove deprecated experimental options for Next.js 16
   experimental: {
-    appDir: true,
-    turbopack: {}, // empty object prevents Turbopack build errors
+    // Only include valid experimental options for Next.js 16
   },
 
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**', // replace with specific hostnames if possible
+        hostname: '**',
       },
     ],
     formats: ['image/avif', 'image/webp'],
@@ -43,6 +42,11 @@ const nextConfig = {
         ],
       },
     ]
+  },
+
+  // Turbopack configuration for Next.js 16
+  turbopack: {
+    root: __dirname,
   },
 }
 

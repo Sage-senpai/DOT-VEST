@@ -1,4 +1,4 @@
-// FILE: app/dashboard/layout.tsx (WITH UNIFIED STATE)
+// FILE: app/dashboard/layout.tsx (FIXED - No Auto Profile Modal)
 "use client"
 
 import type React from "react"
@@ -43,11 +43,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    if (profileMounted && !profile) {
-      setProfileModalOpen(true)
-    }
-  }, [profileMounted, profile])
+  // REMOVED: Auto-open profile modal check
+  // Users can manually open it via avatar button or Profile page
 
   const currentPage = navItems.find(item => item.href === pathname)
   const pageTitle = currentPage?.label || "Dashboard"
@@ -105,7 +102,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             const Icon = item.icon
             const isActive = pathname === item.href
             
-            // Show badge for active items
             let badge: number | null = null
             if (item.href === '/dashboard/aggregator') badge = totalStrategies
             if (item.href === '/dashboard/vaults') badge = totalVaults
@@ -163,7 +159,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Wallet Status Indicator */}
         {showSidebar && (
           <div className="px-4 py-3 border-t border-border/50">
             <div className={cn(

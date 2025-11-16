@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client" // ✅ Use your existing client
 
 export interface ExecutedStrategy {
   id: string
@@ -16,12 +16,11 @@ export interface ExecutedStrategy {
   user_id?: string | null
 }
 
-
 export function useStrategyVaults() {
   const [strategies, setStrategies] = useState<ExecutedStrategy[]>([])
   const [mounted, setMounted] = useState(false)
   const { selectedAccount } = usePolkadotExtension()
-  const supabase = createClientComponentClient()
+  const supabase = createClient() // ✅ Use the SSR-compatible client
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {

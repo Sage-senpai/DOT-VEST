@@ -1,6 +1,7 @@
 // FILE: hooks/use-live-pools.ts (FIXED)
 // LOCATION: /hooks/use-live-pools.ts
 // ============================================
+"use client"
 import { useState, useEffect, useCallback } from 'react'
 
 export interface LivePool {

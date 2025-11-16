@@ -1,4 +1,4 @@
-// FILE: hooks/use-wallet-balance.ts (WITH REAL PRICES)
+// FILE: hooks/use-wallet-balance.ts (FIXED - Asset Hub Support)
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
@@ -28,17 +28,26 @@ interface ChainConfig {
   symbol: string
   decimals: number
   coingeckoId: string
+  isAssetHub?: boolean
 }
 
-type ChainKey = 'polkadot' | 'acala' | 'hydration' | 'bifrost'
+type ChainKey = 'polkadot' | 'assethub' | 'acala' | 'hydration' | 'bifrost'
 
 const CHAIN_CONFIGS: Record<ChainKey, ChainConfig> = {
   polkadot: {
-    name: 'Polkadot',
+    name: 'Polkadot Relay',
     rpcUrl: process.env.NEXT_PUBLIC_POLKADOT_RPC_URL || 'wss://rpc.polkadot.io',
     symbol: 'DOT',
     decimals: 10,
     coingeckoId: 'polkadot'
+  },
+  assethub: {
+    name: 'Asset Hub',
+    rpcUrl: 'wss://polkadot-asset-hub-rpc.polkadot.io',
+    symbol: 'DOT',
+    decimals: 10,
+    coingeckoId: 'polkadot',
+    isAssetHub: true
   },
   acala: {
     name: 'Acala',
@@ -63,15 +72,12 @@ const CHAIN_CONFIGS: Record<ChainKey, ChainConfig> = {
   },
 }
 
-// Cache for prices (5 minute TTL)
 let priceCache: { [key: string]: { price: number; timestamp: number } } = {}
-const PRICE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const PRICE_CACHE_TTL = 5 * 60 * 1000
 
 async function fetchRealPrices(): Promise<{ [key: string]: number }> {
   try {
     const now = Date.now()
-    
-    // Check cache first
     const cachedPrices: { [key: string]: number } = {}
     let needsFetch = false
     
@@ -85,33 +91,24 @@ async function fetchRealPrices(): Promise<{ [key: string]: number }> {
     })
     
     if (!needsFetch && Object.keys(cachedPrices).length > 0) {
-      console.log('[Wallet] Using cached prices')
       return cachedPrices
     }
     
-    // Fetch from CoinGecko
-    const ids = Object.values(CHAIN_CONFIGS).map(c => c.coingeckoId).join(',')
+    const ids = [...new Set(Object.values(CHAIN_CONFIGS).map(c => c.coingeckoId))].join(',')
     const response = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+      { next: { revalidate: 300 } }
     )
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch prices')
-    }
+    if (!response.ok) throw new Error('Failed to fetch prices')
     
     const data = await response.json()
-    
     const prices: { [key: string]: number } = {}
+    
     Object.entries(CHAIN_CONFIGS).forEach(([key, config]) => {
       const price = data[config.coingeckoId]?.usd || 0
       prices[config.symbol] = price
-      
-      // Update cache
-      priceCache[config.coingeckoId] = {
-        price,
-        timestamp: now
-      }
+      priceCache[config.coingeckoId] = { price, timestamp: now }
     })
     
     console.log('[Wallet] Fetched real prices:', prices)
@@ -119,7 +116,6 @@ async function fetchRealPrices(): Promise<{ [key: string]: number }> {
     
   } catch (error) {
     console.error('[Wallet] Error fetching prices:', error)
-    // Fallback to approximate values if API fails
     return {
       DOT: 7.5,
       ACA: 0.08,
@@ -136,6 +132,7 @@ export function useWalletBalance() {
   const [error, setError] = useState<string | null>(null)
   const [totalPortfolioValue, setTotalPortfolioValue] = useState(0)
   const [prices, setPrices] = useState<{ [key: string]: number }>({})
+  const [viewMode, setViewMode] = useState<'relay' | 'assethub' | 'both'>('both')
 
   const fetchChainBalance = useCallback(async (
     chainKey: ChainKey,
@@ -163,7 +160,6 @@ export function useWalletBalance() {
         decimals: config.decimals 
       })
 
-      // Calculate USD value with real price
       const balanceNumber = Number(free) / Math.pow(10, config.decimals)
       const price = tokenPrices[config.symbol] || 0
       const usdValue = balanceNumber * price
@@ -200,11 +196,19 @@ export function useWalletBalance() {
     setError(null)
 
     try {
-      // Fetch real prices first
       const tokenPrices = await fetchRealPrices()
       setPrices(tokenPrices)
       
-      const chainKeys: ChainKey[] = ['polkadot', 'acala', 'hydration', 'bifrost']
+      let chainKeys: ChainKey[]
+      
+      if (viewMode === 'relay') {
+        chainKeys = ['polkadot', 'acala', 'hydration', 'bifrost']
+      } else if (viewMode === 'assethub') {
+        chainKeys = ['assethub', 'acala', 'hydration', 'bifrost']
+      } else {
+        chainKeys = ['polkadot', 'assethub', 'acala', 'hydration', 'bifrost']
+      }
+
       const balancePromises = chainKeys.map(key => 
         fetchChainBalance(key, selectedAccount.address, tokenPrices)
       )
@@ -214,25 +218,22 @@ export function useWalletBalance() {
 
       setBalances(validBalances)
 
-      // Calculate total portfolio value
       const total = validBalances.reduce((sum, chain) => sum + chain.totalUsdValue, 0)
       setTotalPortfolioValue(total)
       
-      console.log(`[Wallet] Updated balances. Total: $${total.toFixed(2)}`)
+      console.log(`[Wallet] Updated balances (${viewMode}). Total: $${total.toFixed(2)}`)
     } catch (err) {
       console.error('Error refreshing balances:', err)
       setError('Failed to fetch wallet balances')
     } finally {
       setLoading(false)
     }
-  }, [selectedAccount, isReady, fetchChainBalance])
+  }, [selectedAccount, isReady, fetchChainBalance, viewMode])
 
-  // Auto-refresh on account change
   useEffect(() => {
     refreshBalances()
   }, [refreshBalances])
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!selectedAccount || !isReady) return
 
@@ -243,6 +244,10 @@ export function useWalletBalance() {
     return () => clearInterval(interval)
   }, [selectedAccount, isReady, refreshBalances])
 
+  const switchViewMode = useCallback((mode: 'relay' | 'assethub' | 'both') => {
+    setViewMode(mode)
+  }, [])
+
   return {
     balances,
     totalPortfolioValue,
@@ -251,5 +256,7 @@ export function useWalletBalance() {
     refreshBalances,
     isReady: isReady && selectedAccount !== null,
     prices,
+    viewMode,
+    switchViewMode,
   }
 }

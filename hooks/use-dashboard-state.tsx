@@ -1,4 +1,3 @@
-// FILE: hooks/use-dashboard-state.ts (UNIFIED STATE MANAGEMENT)
 "use client"
 
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
@@ -27,75 +26,100 @@ export interface DashboardVault {
   apy: number
   chain: string
   status: 'active' | 'paused'
+  wallet_address: string
 }
 
 interface DashboardState {
-  // Wallet state
   isWalletConnected: boolean
   walletAddress: string | null
   walletBalance: number
-  
-  // Portfolio state
   totalPortfolioValue: number
   totalStrategies: number
   totalVaults: number
   totalEarnings: number
   avgAPY: number
-  
-  // Strategies
   strategies: DashboardStrategy[]
-  
-  // Vaults
   vaults: DashboardVault[]
-  
-  // Loading states
   isLoading: boolean
   isSyncing: boolean
   
-  // Actions
+  // Multi-wallet overview
+  allWalletAddresses: string[]
+  overviewStats: () => {
+    totalAcrossAllWallets: number
+    totalStrategiesAllWallets: number
+    totalVaultsAllWallets: number
+  }
+  
   addStrategy: (strategy: Omit<DashboardStrategy, 'id' | 'wallet_address' | 'user_id'>) => Promise<void>
-  addVault: (vault: Omit<DashboardVault, 'id'>) => Promise<void>
+  addVault: (vault: Omit<DashboardVault, 'id' | 'wallet_address'>) => Promise<void>
   refreshData: () => Promise<void>
+  switchWallet: (address: string) => void
 }
 
 const DashboardContext = createContext<DashboardState | null>(null)
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const { selectedAccount, isReady } = useEnhancedPolkadot()
-  const { totalPortfolioValue, balances, refreshBalances } = useWalletBalance()
-  
+  const { selectedAccount, isReady, connectedAccounts } = useEnhancedPolkadot()
+  const { totalPortfolioValue, refreshBalances } = useWalletBalance()
+
   const [strategies, setStrategies] = useState<DashboardStrategy[]>([])
   const [vaults, setVaults] = useState<DashboardVault[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [allWalletAddresses, setAllWalletAddresses] = useState<string[]>([])
 
-  // Load data from localStorage and sync
+  /** Safely compute overview stats client-side */
+  const computeOverviewStats = useCallback(() => {
+    if (typeof window === 'undefined') return {
+      totalAcrossAllWallets: 0,
+      totalStrategiesAllWallets: 0,
+      totalVaultsAllWallets: 0
+    }
+
+    const allStrategies = JSON.parse(localStorage.getItem('dotvest-strategies') || '[]')
+    const allVaults = JSON.parse(localStorage.getItem('dotvest-vaults') || '[]')
+
+    const totalStrategiesAllWallets = allStrategies.length
+    const totalVaultsAllWallets = allVaults.length
+    const totalAcrossAllWallets = allStrategies.reduce((sum: number, s: DashboardStrategy) => sum + s.amount, 0) +
+                                   allVaults.reduce((sum: number, v: DashboardVault) => sum + v.deposited, 0)
+
+    return { totalAcrossAllWallets, totalStrategiesAllWallets, totalVaultsAllWallets }
+  }, [])
+
+  /** Load strategies & vaults for current wallet */
   const loadData = useCallback(async () => {
+    if (typeof window === 'undefined') return
+
+    setIsLoading(true)
     try {
-      setIsLoading(true)
-      
-      // Load strategies
-      const savedStrategies = localStorage.getItem('dotvest-strategies')
-      if (savedStrategies) {
-        const parsed = JSON.parse(savedStrategies)
-        // Filter by current wallet if connected
-        const filtered = selectedAccount 
-          ? parsed.filter((s: DashboardStrategy) => s.wallet_address === selectedAccount.address)
-          : parsed
-        setStrategies(filtered)
-      }
-      
+     // Load strategies
+const savedStrategies: DashboardStrategy[] = JSON.parse(localStorage.getItem('dotvest-strategies') || '[]')
+const filteredStrategies = selectedAccount
+  ? savedStrategies.filter((s: DashboardStrategy) => s.wallet_address === selectedAccount.address)
+  : savedStrategies
+setStrategies(filteredStrategies)
+
+// Track all wallet addresses (type-safe)
+const addresses = [
+  ...new Set(
+    savedStrategies
+      .map((s: DashboardStrategy) => s.wallet_address)
+      .filter((addr): addr is string => typeof addr === 'string') // type-safe string filter
+  )
+]
+setAllWalletAddresses(addresses)
+
+
       // Load vaults
-      const savedVaults = localStorage.getItem('dotvest-vaults')
-      if (savedVaults) {
-        const parsed = JSON.parse(savedVaults)
-        const filtered = selectedAccount
-          ? parsed.filter((v: any) => v.wallet_address === selectedAccount.address)
-          : parsed
-        setVaults(filtered)
-      }
-      
+      const savedVaults = JSON.parse(localStorage.getItem('dotvest-vaults') || '[]')
+      const filteredVaults = selectedAccount
+        ? savedVaults.filter((v: DashboardVault) => v.wallet_address === selectedAccount.address)
+        : savedVaults
+      setVaults(filteredVaults)
+
     } catch (error) {
       console.error('[Dashboard] Error loading data:', error)
     } finally {
@@ -103,7 +127,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedAccount])
 
-  // Refresh all data
+  /** Refresh balances and dashboard data */
   const refreshData = useCallback(async () => {
     setIsSyncing(true)
     try {
@@ -111,7 +135,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         loadData(),
         refreshBalances()
       ])
-      console.log('[Dashboard] Data refreshed successfully')
     } catch (error) {
       console.error('[Dashboard] Error refreshing data:', error)
     } finally {
@@ -119,95 +142,77 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData, refreshBalances])
 
-  // Add strategy
-  const addStrategy = useCallback(async (
-    strategyData: Omit<DashboardStrategy, 'id' | 'wallet_address' | 'user_id'>
-  ) => {
-    if (!selectedAccount) {
-      throw new Error('Wallet not connected')
-    }
+  /** Add a strategy */
+  const addStrategy = useCallback(async (strategyData: Omit<DashboardStrategy, 'id' | 'wallet_address' | 'user_id'>) => {
+    if (!selectedAccount) throw new Error('Wallet not connected')
+    if (strategyData.amount > totalPortfolioValue) throw new Error(`Insufficient balance`)
 
     const newStrategy: DashboardStrategy = {
       ...strategyData,
       id: Date.now().toString(),
       wallet_address: selectedAccount.address,
-      user_id: user?.id || undefined,
+      user_id: user?.id,
       status: 'active'
     }
 
-    const updated = [...strategies, newStrategy]
-    setStrategies(updated)
-    
-    // Save to localStorage
-    const allStrategies = localStorage.getItem('dotvest-strategies')
-    const all = allStrategies ? JSON.parse(allStrategies) : []
-    localStorage.setItem('dotvest-strategies', JSON.stringify([...all, newStrategy]))
-    
-    console.log('[Dashboard] Strategy added:', newStrategy.tokenName)
-    
-    // Trigger sync
-    setTimeout(() => refreshData(), 100)
-  }, [selectedAccount, user, strategies, refreshData])
+    const allStrategies = JSON.parse(localStorage.getItem('dotvest-strategies') || '[]')
+    localStorage.setItem('dotvest-strategies', JSON.stringify([...allStrategies, newStrategy]))
+    setStrategies(prev => [...prev, newStrategy])
+    setTimeout(refreshData, 100)
+  }, [selectedAccount, user, totalPortfolioValue, refreshData])
 
-  // Add vault
-  const addVault = useCallback(async (
-    vaultData: Omit<DashboardVault, 'id'>
-  ) => {
-    if (!selectedAccount) {
-      throw new Error('Wallet not connected')
-    }
+  /** Add a vault */
+  const addVault = useCallback(async (vaultData: Omit<DashboardVault, 'id' | 'wallet_address'>) => {
+    if (!selectedAccount) throw new Error('Wallet not connected')
 
     const newVault: DashboardVault = {
       ...vaultData,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      wallet_address: selectedAccount.address
     }
 
-    const updated = [...vaults, newVault]
-    setVaults(updated)
-    
-    // Save to localStorage with wallet address
-    const allVaults = localStorage.getItem('dotvest-vaults')
-    const all = allVaults ? JSON.parse(allVaults) : []
-    const vaultWithWallet = { ...newVault, wallet_address: selectedAccount.address }
-    localStorage.setItem('dotvest-vaults', JSON.stringify([...all, vaultWithWallet]))
-    
-    console.log('[Dashboard] Vault added:', newVault.name)
-    
-    // Trigger sync
-    setTimeout(() => refreshData(), 100)
-  }, [selectedAccount, vaults, refreshData])
+    const allVaults = JSON.parse(localStorage.getItem('dotvest-vaults') || '[]')
+    localStorage.setItem('dotvest-vaults', JSON.stringify([...allVaults, newVault]))
+    setVaults(prev => [...prev, newVault])
+    setTimeout(refreshData, 100)
+  }, [selectedAccount, refreshData])
 
-  // Calculate derived values
+  /** Switch wallet */
+  const switchWallet = useCallback((address: string) => {
+    if (typeof window === 'undefined') return
+    const account = connectedAccounts.find(acc => acc.address === address)
+    if (account) {
+      localStorage.setItem('selected_wallet_address', address)
+      window.location.reload()
+    }
+  }, [connectedAccounts])
+
+  /** Auto-refresh every 30 seconds */
+  useEffect(() => {
+    if (!isReady || !selectedAccount) return
+    const interval = setInterval(refreshData, 30000)
+    return () => clearInterval(interval)
+  }, [isReady, selectedAccount, refreshData])
+
+  /** Load data on mount and whenever wallet changes */
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  /** Derived stats for current wallet */
   const totalStrategies = strategies.filter(s => s.status === 'active').length
   const totalVaults = vaults.filter(v => v.status === 'active').length
-  
   const totalEarnings = strategies.reduce((sum, s) => {
     const monthsElapsed = Math.min(s.duration, 6)
     return sum + (s.amount * parseFloat(s.apy) / 100 * monthsElapsed / 12)
   }, 0) + vaults.reduce((sum, v) => sum + v.earned, 0)
-  
   const avgAPY = strategies.length > 0
     ? strategies.reduce((sum, s) => sum + parseFloat(s.apy), 0) / strategies.length
     : vaults.length > 0
       ? vaults.reduce((sum, v) => sum + v.apy, 0) / vaults.length
       : 0
 
-  // Load data on mount and when wallet changes
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!isReady || !selectedAccount) return
-
-    const interval = setInterval(() => {
-      refreshData()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [isReady, selectedAccount, refreshData])
-
+  /** Dashboard state to provide */
   const state: DashboardState = {
     isWalletConnected: isReady && !!selectedAccount,
     walletAddress: selectedAccount?.address || null,
@@ -221,9 +226,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     vaults,
     isLoading,
     isSyncing,
+    allWalletAddresses,
+    overviewStats: computeOverviewStats,
     addStrategy,
     addVault,
-    refreshData
+    refreshData,
+    switchWallet
   }
 
   return (
@@ -231,13 +239,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       {children}
     </DashboardContext.Provider>
   )
-  
 }
 
 export function useDashboardState() {
   const context = useContext(DashboardContext)
-  if (!context) {
-    throw new Error('useDashboardState must be used within DashboardProvider')
-  }
+  if (!context) throw new Error('useDashboardState must be used within DashboardProvider')
   return context
 }
