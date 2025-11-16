@@ -1,6 +1,4 @@
-// FILE: app/dashboard/layout.tsx (FIXED)
-// LOCATION: /app/dashboard/layout.tsx
-// ============================================
+// FILE: app/dashboard/layout.tsx (WITH UNIFIED STATE)
 "use client"
 
 import type React from "react"
@@ -8,13 +6,14 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, TrendingUp, BarChart3, Settings, LogOut, Menu, X, Zap, Lock, User, ChevronRight } from "lucide-react"
+import { LayoutDashboard, TrendingUp, BarChart3, Settings, LogOut, Menu, X, Zap, Lock, User, ChevronRight, Wallet as WalletIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ProfileModal } from "@/components/core/profile-modal"
 import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useProfile } from "@/hooks/use-profile"
 import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useAuth } from "@/hooks/auth/useAuth"
+import { DashboardProvider, useDashboardState } from "@/hooks/use-dashboard-state"
 import { cn } from "@/lib/utils"
 import WalletManager from "@/components/core/wallet-manager"
 
@@ -27,20 +26,18 @@ const navItems = [
   { icon: User, label: "Profile", href: "/dashboard/profile"}
 ]
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarHovered, setSidebarHovered] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  
   const { profile, mounted: profileMounted } = useProfile()
-  const { selectedAccount, connectWallet, isReady, error } = useEnhancedPolkadot()
+  const { selectedAccount, isReady } = useEnhancedPolkadot()
   const { signOut } = useAuth()
+  const { isWalletConnected, totalStrategies, totalVaults, isSyncing } = useDashboardState()
 
   useEffect(() => {
     setMounted(true)
@@ -51,12 +48,6 @@ export default function DashboardLayout({
       setProfileModalOpen(true)
     }
   }, [profileMounted, profile])
-
-  useEffect(() => {
-    if (!isReady && !error) {
-      connectWallet().catch((err) => console.log("[DotVest] Wallet connection failed:", err))
-    }
-  }, [isReady, error, connectWallet])
 
   const currentPage = navItems.find(item => item.href === pathname)
   const pageTitle = currentPage?.label || "Dashboard"
@@ -114,6 +105,11 @@ export default function DashboardLayout({
             const Icon = item.icon
             const isActive = pathname === item.href
             
+            // Show badge for active items
+            let badge: number | null = null
+            if (item.href === '/dashboard/aggregator') badge = totalStrategies
+            if (item.href === '/dashboard/vaults') badge = totalVaults
+            
             return (
               <Link
                 key={item.href}
@@ -144,9 +140,16 @@ export default function DashboardLayout({
                 </div>
 
                 {showSidebar && (
-                  <span className="animate-in fade-in slide-in-from-left-2 duration-300">
-                    {item.label}
-                  </span>
+                  <>
+                    <span className="flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                      {item.label}
+                    </span>
+                    {badge !== null && badge > 0 && (
+                      <span className="px-2 py-0.5 text-xs font-semibold bg-primary/20 text-primary rounded-full">
+                        {badge}
+                      </span>
+                    )}
+                  </>
                 )}
 
                 {!showSidebar && (
@@ -159,6 +162,24 @@ export default function DashboardLayout({
             )
           })}
         </nav>
+
+        {/* Wallet Status Indicator */}
+        {showSidebar && (
+          <div className="px-4 py-3 border-t border-border/50">
+            <div className={cn(
+              "flex items-center gap-2 p-2 rounded-lg text-xs",
+              isWalletConnected ? "bg-accent/10 text-accent" : "bg-muted"
+            )}>
+              <WalletIcon className="w-3 h-3" />
+              <span className="flex-1">
+                {isWalletConnected ? 'Wallet Connected' : 'No Wallet'}
+              </span>
+              {isSyncing && (
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+              )}
+            </div>
+          </div>
+        )}
 
         <div className={cn(
           "p-4 border-t border-border/50",
@@ -195,6 +216,12 @@ export default function DashboardLayout({
             <h1 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               {pageTitle}
             </h1>
+            {isSyncing && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                Syncing...
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -244,5 +271,17 @@ export default function DashboardLayout({
         walletAddress={selectedAccount?.address || undefined}
       />
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <DashboardProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </DashboardProvider>
   )
 }

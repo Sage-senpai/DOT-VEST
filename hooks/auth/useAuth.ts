@@ -1,4 +1,4 @@
-// FILE: hooks/auth/useAuth.ts
+// FILE: hooks/auth/useAuth.ts (FIXED SESSION CLEARING)
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -111,10 +111,48 @@ export function useAuth() {
   const signOut = async () => {
     try {
       setLoading(true)
+      
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+      
+      // Clear local state
       setUser(null)
+      
+      // Clear ALL auth-related localStorage items
+      const authKeys = [
+        'supabase.auth.token',
+        'sb-khnjetfjwdntxnomcoku-auth-token',
+        'selected_wallet_address',
+        'pending_wallet_address',
+        'wallet_custom_names',
+        'dotvest-strategies'
+      ]
+      
+      authKeys.forEach(key => {
+        try {
+          localStorage.removeItem(key)
+        } catch (e) {
+          console.error(`Error clearing ${key}:`, e)
+        }
+      })
+      
+      // Clear sessionStorage
+      sessionStorage.clear()
+      
+      // Mark as intentional logout
+      sessionStorage.setItem('logged_out', 'true')
+      
+      console.log('[Auth] Successfully signed out and cleared session')
+      
+      // Redirect to home
       router.push('/')
+      
+      // Force reload to clear any cached data
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 100)
+      
     } catch (error) {
       console.error('Sign out error:', error)
     } finally {

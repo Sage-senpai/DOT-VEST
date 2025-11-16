@@ -1,17 +1,29 @@
-// FILE: app/(auth)/register/page.tsx
+// FILE: app/(auth)/register/page.tsx (WITH WALLET SELECTION)
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Mail, Lock, User, CheckCircle2, Wallet, Loader2 } from 'lucide-react'
+import { Zap, Mail, Lock, User, CheckCircle2, Wallet, Loader2, ExternalLink, RefreshCw, X } from 'lucide-react'
 import { useAuth } from '@/hooks/auth/useAuth'
+import { useEnhancedPolkadot } from '@/hooks/use-enhanced-polkadot'
 import { Button } from '@/components/ui/button'
 import styles from './styles.module.css'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { signUp, loading } = useAuth()
+  const { signUp, loading: authLoading } = useAuth()
+  const { 
+    selectedAccount, 
+    connectedAccounts,
+    connectWallet, 
+    disconnectWallet,
+    isReady, 
+    error: walletError,
+    isConnecting,
+    availableExtensions,
+    supportedWallets
+  } = useEnhancedPolkadot()
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -21,17 +33,17 @@ export default function RegisterPage() {
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [pendingWallet, setPendingWallet] = useState<string | null>(null)
+  const [showWalletSelector, setShowWalletSelector] = useState(false)
 
+  // Check for pending wallet on mount
   useEffect(() => {
-    // Check if there's a pending wallet from onboarding
     const pending = localStorage.getItem('pending_wallet_address')
-    if (pending) {
-      setPendingWallet(pending)
+    if (pending && !selectedAccount) {
+      // Try to auto-connect
+      connectWallet().catch(err => console.log('[Register] Auto-connect failed:', err))
     }
   }, [])
 
-  // === Validation ===
   const validatePassword = (password: string) => {
     if (password.length < 8) return 'Password must be at least 8 characters'
     if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter'
@@ -40,7 +52,22 @@ export default function RegisterPage() {
     return null
   }
 
-  // === Email Registration ===
+  const handleWalletConnect = async (walletName?: string) => {
+    setError('')
+    try {
+      await connectWallet(walletName)
+      setShowWalletSelector(false)
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect wallet')
+    }
+  }
+
+  const handleWalletDisconnect = () => {
+    disconnectWallet()
+    localStorage.removeItem('pending_wallet_address')
+    setError('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -60,7 +87,7 @@ export default function RegisterPage() {
       const { data, error: signUpError } = await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
         auth_method: 'email',
-        wallet_address: pendingWallet || undefined,
+        wallet_address: selectedAccount?.address || undefined,
       })
 
       if (signUpError) {
@@ -70,13 +97,12 @@ export default function RegisterPage() {
 
       if (data?.user) {
         setSuccess(true)
-        // Redirect back to onboarding if there was a pending wallet
+        
+        // Clear pending wallet
+        localStorage.removeItem('pending_wallet_address')
+        
         setTimeout(() => {
-          if (pendingWallet) {
-            router.push('/onboarding')
-          } else {
-            router.push('/dashboard')
-          }
+          router.push('/dashboard')
         }, 1500)
       }
     } catch (err: any) {
@@ -84,7 +110,6 @@ export default function RegisterPage() {
     }
   }
 
-  // === Success State ===
   if (success) {
     return (
       <div className={styles.container}>
@@ -92,18 +117,12 @@ export default function RegisterPage() {
         <div className={styles.successCard}>
           <CheckCircle2 className={styles.successIcon} />
           <h2 className={styles.successTitle}>Account Created!</h2>
-          <p className={styles.successText}>
-            {pendingWallet 
-              ? 'Redirecting to complete your profile...'
-              : 'Redirecting to your dashboard...'
-            }
-          </p>
+          <p className={styles.successText}>Redirecting to your dashboard...</p>
         </div>
       </div>
     )
   }
 
-  // === UI ===
   return (
     <div className={styles.container}>
       <div className={styles.gradientBg} />
@@ -126,20 +145,105 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {pendingWallet && (
-            <div className="mb-4 p-4 bg-primary/10 border border-primary/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Wallet className="w-4 h-4 text-primary" />
-                <p className="text-sm font-semibold">Wallet Connected</p>
+          {/* Wallet Connection Section */}
+          <div className="mb-6">
+            {!isReady || !selectedAccount ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Optional: Connect your wallet
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowWalletSelector(!showWalletSelector)}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      {showWalletSelector ? 'Cancel' : 'Connect Wallet'}
+                    </>
+                  )}
+                </Button>
+
+                {showWalletSelector && (
+                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                    {availableExtensions.filter(ext => ext.installed).length > 0 ? (
+                      availableExtensions
+                        .filter(ext => ext.installed)
+                        .map((ext) => (
+                          <button
+                            key={ext.name}
+                            onClick={() => {
+                              const walletKey = Object.entries(supportedWallets)
+                                .find(([_, w]) => w.name === ext.name)?.[0]
+                              if (walletKey) handleWalletConnect(walletKey)
+                            }}
+                            className="w-full p-3 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-card/50 transition-all flex items-center gap-3"
+                          >
+                            <span className="text-2xl">{ext.logo}</span>
+                            <span className="font-medium">{ext.name}</span>
+                          </button>
+                        ))
+                    ) : (
+                      <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">No wallet extensions detected</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Install a Polkadot wallet to connect:
+                        </p>
+                        {Object.entries(supportedWallets).map(([key, wallet]) => (
+                          <a
+                            key={key}
+                            href={wallet.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-2 rounded hover:bg-accent/20 transition-colors mb-1"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{wallet.logo}</span>
+                              <span className="text-sm">{wallet.name}</span>
+                            </div>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                {pendingWallet.slice(0, 8)}...{pendingWallet.slice(-6)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Creating an account to link with this wallet
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-semibold">Wallet Connected</p>
+                  </div>
+                  <button
+                    onClick={handleWalletDisconnect}
+                    className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                    title="Disconnect wallet"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {selectedAccount.customName || selectedAccount.name}
+                </p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {selectedAccount.address.slice(0, 8)}...{selectedAccount.address.slice(-6)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  from {selectedAccount.source}
+                </p>
+              </div>
+            )}
+          </div>
 
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.inputGroup}>
@@ -156,7 +260,7 @@ export default function RegisterPage() {
                   placeholder="John Doe"
                   className={styles.input}
                   required
-                  disabled={loading}
+                  disabled={authLoading}
                 />
               </div>
             </div>
@@ -175,7 +279,7 @@ export default function RegisterPage() {
                   placeholder="you@example.com"
                   className={styles.input}
                   required
-                  disabled={loading}
+                  disabled={authLoading}
                 />
               </div>
             </div>
@@ -194,7 +298,7 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   className={styles.input}
                   required
-                  disabled={loading}
+                  disabled={authLoading}
                 />
               </div>
               <p className={styles.passwordHint}>
@@ -218,7 +322,7 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   className={styles.input}
                   required
-                  disabled={loading}
+                  disabled={authLoading}
                 />
               </div>
             </div>
@@ -226,9 +330,9 @@ export default function RegisterPage() {
             <Button
               type="submit"
               className="w-full bg-primary hover:bg-primary/90"
-              disabled={loading}
+              disabled={authLoading}
             >
-              {loading ? (
+              {authLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creating Account...
