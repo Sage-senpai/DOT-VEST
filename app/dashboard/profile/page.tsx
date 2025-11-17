@@ -1,10 +1,8 @@
-// FILE: app/dashboard/profile/page.tsx (FIXED)
-// LOCATION: /app/dashboard/profile/page.tsx
-// ============================================
+// FILE: app/dashboard/profile/page.tsx (REAL ACHIEVEMENTS ONLY)
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Wallet, TrendingUp, Award, Calendar, Edit2, Copy, Check } from "lucide-react"
+import { User, Wallet, TrendingUp, Award, Calendar, Edit2, Copy, Check, GraduationCap } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useProfile } from "@/hooks/use-profile"
@@ -16,7 +14,7 @@ export default function Profile() {
   const { profile, updateProfile } = useProfile()
   const { selectedAccount, accounts } = usePolkadotExtension()
   const { balances, totalPortfolioValue, loading: balancesLoading } = useWalletBalance()
-  const { strategies } = useStrategyVaults()
+  const { strategies, getRealStats, getDemoStrategies } = useStrategyVaults()
   
   const [editing, setEditing] = useState(false)
   const [formData, setFormData] = useState({
@@ -49,16 +47,9 @@ export default function Profile() {
     }
   }
 
-  const totalStrategies = strategies.length
-  const totalDeposited = strategies.reduce((sum, s) => sum + s.amount, 0)
-  const avgAPY = strategies.length > 0
-    ? strategies.reduce((sum, s) => sum + parseFloat(s.apy), 0) / strategies.length
-    : 0
-
-  const totalEarned = strategies.reduce((sum, s) => {
-    const monthsElapsed = s.duration ? Math.min(s.duration, 6) : 1
-    return sum + (s.amount * parseFloat(s.apy) / 100 * monthsElapsed / 12)
-  }, 0)
+  // Get real stats (excluding demos)
+  const realStats = getRealStats()
+  const demoStrategies = getDemoStrategies()
 
   const memberSince = profile?.created_at 
     ? new Date(profile.created_at).toLocaleDateString('en-US', { 
@@ -168,16 +159,33 @@ export default function Profile() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-accent">{totalStrategies}</p>
+              <p className="text-2xl font-bold text-accent">{realStats.count}</p>
               <p className="text-xs text-muted-foreground">Active Strategies</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-primary">{avgAPY.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-primary">{realStats.avgAPY.toFixed(1)}%</p>
               <p className="text-xs text-muted-foreground">Avg APY</p>
             </div>
           </div>
         </div>
       </Card>
+
+      {/* Demo Strategies Notice */}
+      {demoStrategies.length > 0 && (
+        <Card className="backdrop-blur-xl bg-secondary/10 border border-secondary/30 p-4 rounded-lg">
+          <div className="flex items-center gap-3">
+            <GraduationCap className="w-5 h-5 text-secondary" />
+            <div>
+              <p className="text-sm font-semibold text-secondary">
+                You have {demoStrategies.length} demo strateg{demoStrategies.length === 1 ? 'y' : 'ies'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Demo strategies are for learning only and don't count toward achievements
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
@@ -281,7 +289,9 @@ export default function Profile() {
           <div className="text-center py-8">
             <Wallet className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <p className="text-muted-foreground mb-4">No wallet connected</p>
-            <Button className="bg-primary hover:bg-primary/90">Connect Wallet</Button>
+            <p className="text-sm text-muted-foreground mb-4">
+              Use the Wallet Manager in the top navigation bar to connect your wallet
+            </p>
           </div>
         )}
       </Card>
@@ -289,32 +299,33 @@ export default function Profile() {
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <TrendingUp className="w-5 h-5 text-accent" />
-          <h3 className="text-lg font-semibold">Activity Summary</h3>
+          <h3 className="text-lg font-semibold">Activity Summary (Real Funds Only)</h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-sm text-muted-foreground mb-2">Total Deposited</p>
-            <p className="text-3xl font-bold">${totalDeposited.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Across all vaults</p>
+            <p className="text-3xl font-bold">${realStats.totalDeposited.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Across {realStats.count} vaults</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-2">Total Earned</p>
-            <p className="text-3xl font-bold text-accent">${totalEarned.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-accent">${realStats.totalEarned.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground mt-1">To date</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-2">Average APY</p>
-            <p className="text-3xl font-bold text-primary">{avgAPY.toFixed(1)}%</p>
+            <p className="text-3xl font-bold text-primary">{realStats.avgAPY.toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground mt-1">Portfolio average</p>
           </div>
         </div>
 
-        {strategies.length > 0 && (
+        {strategies.filter(s => !s.isDemo && s.status !== 'demo').length > 0 && (
           <div className="mt-6 pt-6 border-t border-border/50">
-            <p className="text-sm font-medium mb-3">Recent Strategies</p>
+            <p className="text-sm font-medium mb-3">Recent Real Strategies</p>
             <div className="space-y-2">
               {strategies
+                .filter(s => !s.isDemo && s.status !== 'demo')
                 .sort((a, b) => new Date(b.executedAt || 0).getTime() - new Date(a.executedAt || 0).getTime())
                 .slice(0, 3)
                 .map((strategy) => (
@@ -341,17 +352,17 @@ export default function Profile() {
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="flex items-center gap-3 mb-6">
           <Award className="w-5 h-5 text-secondary" />
-          <h3 className="text-lg font-semibold">Achievements</h3>
+          <h3 className="text-lg font-semibold">Achievements (Real Activities Only)</h3>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { name: "First Stake", earned: totalStrategies >= 1, icon: "🎯" },
+            { name: "First Stake", earned: realStats.count >= 1, icon: "🎯" },
             { name: "Early Adopter", earned: profile?.created_at ? true : false, icon: "🌟" },
-            { name: "Yield Master", earned: totalStrategies >= 5, icon: "💎" },
+            { name: "Yield Master", earned: realStats.count >= 5, icon: "💎" },
             { name: "Diversified", earned: balances.length >= 3, icon: "🌈" },
-            { name: "Big Player", earned: totalDeposited >= 1000, icon: "🐋" },
-            { name: "Consistent", earned: totalStrategies >= 3 && avgAPY > 10, icon: "⭐" },
+            { name: "Big Player", earned: realStats.totalDeposited >= 1000, icon: "🐋" },
+            { name: "Consistent", earned: realStats.count >= 3 && realStats.avgAPY > 10, icon: "⭐" },
           ].map((achievement) => (
             <div
               key={achievement.name}
@@ -368,6 +379,12 @@ export default function Profile() {
               )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 p-4 bg-accent/5 border border-accent/20 rounded-lg">
+          <p className="text-xs text-muted-foreground">
+            💡 <span className="font-medium text-accent">Note:</span> Achievements are based on real strategies only. Demo strategies don't count toward your progress.
+          </p>
         </div>
       </Card>
     </div>

@@ -1,8 +1,7 @@
-// FILE: hooks/use-enhanced-polkadot.ts
+// FILE: hooks/use-enhanced-polkadot.ts (FIXED - ACTUALLY TRIGGERS EXTENSION POPUP)
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import type { InjectedExtension } from '@polkadot/extension-inject/types'
 
 export interface WalletAccount {
   address: string
@@ -50,7 +49,6 @@ export function useEnhancedPolkadot() {
   const [error, setError] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
 
-  // Load custom names from localStorage
   const loadCustomNames = useCallback(() => {
     try {
       const saved = localStorage.getItem('wallet_custom_names')
@@ -60,7 +58,6 @@ export function useEnhancedPolkadot() {
     }
   }, [])
 
-  // Save custom name
   const saveCustomName = useCallback((address: string, customName: string) => {
     try {
       const names = loadCustomNames()
@@ -81,7 +78,6 @@ export function useEnhancedPolkadot() {
     }
   }, [selectedAccount, loadCustomNames])
 
-  // Detect installed extensions
   const detectExtensions = useCallback(async () => {
     if (typeof window === 'undefined') return []
 
@@ -105,7 +101,6 @@ export function useEnhancedPolkadot() {
     return detected
   }, [])
 
-  // Initialize - detect extensions
   useEffect(() => {
     let interval: NodeJS.Timeout
 
@@ -117,7 +112,6 @@ export function useEnhancedPolkadot() {
       if (hasInstalled) {
         setIsReady(true)
       } else {
-        // Keep checking for 5 seconds
         let attempts = 0
         interval = setInterval(async () => {
           attempts++
@@ -143,54 +137,35 @@ export function useEnhancedPolkadot() {
     }
   }, [detectExtensions])
 
-  // Connect to specific wallet extension
+  // FIXED: Actually triggers extension popup
   const connectWallet = useCallback(async (walletName?: string) => {
     setIsConnecting(true)
     setError(null)
 
     try {
-      const { web3Accounts, web3Enable, web3FromSource } = await import('@polkadot/extension-dapp')
+      console.log('[DotVest] Starting wallet connection...')
       
-      const injectedWeb3 = (window as any).injectedWeb3
-      if (!injectedWeb3) {
-        throw new Error('No wallet extensions detected')
-      }
-
-      // Get available extension keys
-      const availableKeys = Object.keys(injectedWeb3).filter(key => 
-        Object.keys(SUPPORTED_WALLETS).includes(key)
-      )
-
-      if (availableKeys.length === 0) {
-        throw new Error('No supported wallet extensions found')
-      }
-
-      // Use specified wallet or first available
-      const targetWallet = walletName || availableKeys[0]
+      const { web3Accounts, web3Enable } = await import('@polkadot/extension-dapp')
       
-      if (!injectedWeb3[targetWallet]) {
-        throw new Error(`${targetWallet} extension not found`)
-      }
-
-      console.log(`[DotVest] Connecting to ${targetWallet}...`)
-
-      // Enable the extension
+      // THIS IS THE KEY: web3Enable MUST be called to trigger popup
+      console.log('[DotVest] Requesting wallet access...')
       const extensions = await web3Enable('DotVest')
       
       if (extensions.length === 0) {
-        throw new Error('User denied access to wallet extension')
+        throw new Error('Please approve the connection in your wallet extension')
       }
 
-      // Get accounts from ALL extensions (so user can choose)
+      console.log('[DotVest] Wallet access granted, fetching accounts...')
+      
+      // Now get accounts
       const allAccounts = await web3Accounts()
       
       if (allAccounts.length === 0) {
-        throw new Error('No accounts found in wallet extensions')
+        throw new Error('No accounts found. Please create an account in your wallet extension first.')
       }
 
       const customNames = loadCustomNames()
 
-      // Format accounts with their source extension
       const formattedAccounts: WalletAccount[] = allAccounts.map(acc => ({
         address: acc.address,
         name: acc.meta.name || 'Unnamed Account',
@@ -199,24 +174,26 @@ export function useEnhancedPolkadot() {
       }))
 
       setConnectedAccounts(formattedAccounts)
-      setSelectedExtension(targetWallet)
 
-      // Restore previous selection or use first account
+      // Auto-select first account or restore previous
       const savedAddress = localStorage.getItem('selected_wallet_address')
       const accountToSelect = savedAddress 
-        ? formattedAccounts.find(acc => acc.address === savedAddress)
-        : formattedAccounts.find(acc => acc.source === targetWallet) || formattedAccounts[0]
+        ? formattedAccounts.find(acc => acc.address === savedAddress) || formattedAccounts[0]
+        : formattedAccounts[0]
       
-      if (accountToSelect) {
-        setSelectedAccount(accountToSelect)
-        localStorage.setItem('selected_wallet_address', accountToSelect.address)
-      }
+      setSelectedAccount(accountToSelect)
+      localStorage.setItem('selected_wallet_address', accountToSelect.address)
+      
+      // Clear disconnect flag
+      sessionStorage.removeItem('wallet_disconnected')
 
       setIsReady(true)
-      console.log(`[DotVest] Connected successfully. Found ${formattedAccounts.length} accounts`)
+      setError(null)
+      
+      console.log(`[DotVest] ✅ Connected successfully. ${formattedAccounts.length} accounts found`)
 
     } catch (err: any) {
-      console.error('[DotVest] Wallet connection failed:', err)
+      console.error('[DotVest] ❌ Wallet connection failed:', err)
       setError(err.message || 'Failed to connect wallet')
       setIsReady(false)
     } finally {
@@ -224,7 +201,6 @@ export function useEnhancedPolkadot() {
     }
   }, [loadCustomNames])
 
-  // Switch to different account
   const switchAccount = useCallback((address: string) => {
     const account = connectedAccounts.find(acc => acc.address === address)
     if (account) {
@@ -233,7 +209,6 @@ export function useEnhancedPolkadot() {
     }
   }, [connectedAccounts])
 
-  // Disconnect wallet
   const disconnectWallet = useCallback(() => {
     setSelectedAccount(null)
     setConnectedAccounts([])
@@ -244,7 +219,6 @@ export function useEnhancedPolkadot() {
     console.log('[DotVest] Wallet disconnected')
   }, [])
 
-  // Get accounts by extension
   const getAccountsByExtension = useCallback((extensionName: string) => {
     return connectedAccounts.filter(acc => acc.source === extensionName)
   }, [connectedAccounts])

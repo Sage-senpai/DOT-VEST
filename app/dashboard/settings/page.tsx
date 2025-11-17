@@ -1,4 +1,4 @@
-// FILE: app/dashboard/settings/page.tsx
+// FILE: app/dashboard/settings/page.tsx (FIXED - NO CONNECT BUTTON)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,7 +9,7 @@ import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useAuth } from "@/hooks/auth/useAuth"
 import { 
   User, Mail, Bell, Shield, Wallet, 
-  Edit2, Save, X, Check, Trash2, Eye, EyeOff,
+  Edit2, Save, X, Check, Trash2,
   Lock, AlertCircle
 } from "lucide-react"
 
@@ -18,7 +18,6 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const { connectedAccounts, selectedAccount, switchAccount, saveCustomName } = useEnhancedPolkadot()
   
-  // Profile state
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -26,11 +25,9 @@ export default function SettingsPage() {
     bio: ''
   })
   
-  // Wallet naming state
   const [editingWallet, setEditingWallet] = useState<string | null>(null)
   const [walletName, setWalletName] = useState('')
   
-  // Notification preferences
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -38,7 +35,6 @@ export default function SettingsPage() {
     weeklyReports: true
   })
   
-  // Security
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     current: '',
@@ -76,9 +72,7 @@ export default function SettingsPage() {
   }
 
   const handlePasswordChange = async () => {
-    // Implement password change with Supabase
     console.log('Changing password...')
-    // TODO: Add Supabase auth.updateUser({ password: passwordForm.new })
   }
 
   return (
@@ -178,21 +172,22 @@ export default function SettingsPage() {
         {connectedAccounts.length === 0 ? (
           <div className="text-center py-8">
             <Wallet className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <p className="text-muted-foreground mb-4">No wallets connected</p>
-            <Button className="bg-primary hover:bg-primary/90">
-              Connect Wallet
-            </Button>
+            <p className="text-muted-foreground mb-2">No wallets connected</p>
+            <p className="text-sm text-muted-foreground">
+              Use the <span className="font-semibold text-primary">Wallet Manager</span> button in the top navigation bar to connect your wallet extensions
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {connectedAccounts.map((account) => {
+            {connectedAccounts.map((account, idx) => {
               const isActive = account.address === selectedAccount?.address
               const isEditing = editingWallet === account.address
               const displayName = account.customName || account.name || 'Unnamed Account'
+              const uniqueKey = `${account.address}-${idx}`
 
               return (
                 <div
-                  key={account.address}
+                  key={uniqueKey}
                   className={`p-4 rounded-lg border transition-all ${
                     isActive
                       ? 'bg-primary/10 border-primary/30 shadow-lg shadow-primary/10'

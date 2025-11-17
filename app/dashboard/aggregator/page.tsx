@@ -1,4 +1,4 @@
-// FILE: app/dashboard/aggregator/page.tsx (COMBINED & ENHANCED)
+// FILE: app/dashboard/aggregator/page.tsx (FIXED HOOKS)
 "use client";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -6,9 +6,9 @@ export const ssr = false;
 
 import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-
 import { Search, ArrowRightLeft, Zap, AlertCircle, CheckCircle2, TrendingUp, Shield, DollarSign, RefreshCw, Wallet } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import type { ExecutedStrategy } from "@/types/ExecutedStrategy"
 import { Button } from "@/components/ui/button"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
@@ -28,18 +28,18 @@ function LastUpdated({ timestamp }: { timestamp?: string }) {
   }, [timestamp])
 
   if (!mounted) return <p className="text-sm font-semibold">Loading...</p>
-
   return <p className="text-sm font-semibold">{time}</p>
 }
 
 export default function RealAggregator() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+  
+  // All hooks must be called unconditionally at the top level
   const { addStrategy } = useStrategyVaults()
   const { selectedAccount, isReady } = usePolkadotExtension()
   const { totalPortfolioValue, balances } = useWalletBalance()
-  
-  const { pools, metadata, loading, refresh, isRefreshing } = useLivePools()
-  const { categories } = usePoolCategories()
+  const { pools, metadata, loading, refresh, isRefreshing, useMockData } = useLivePools()
   const { findOptimal, isLoading: findingOptimal } = useOptimalPool(pools)
   
   const [selectedPool, setSelectedPool] = useState<LivePool | null>(null)
@@ -54,24 +54,10 @@ export default function RealAggregator() {
   const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all')
   const [demoMode, setDemoMode] = useState(false)
   const [showBalanceModal, setShowBalanceModal] = useState(false)
-  const [mounted, setMounted] = useState(false)
 
-  // Client-side only mount check
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Don't render until mounted to avoid SSR issues
-  if (!mounted) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <RefreshCw className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
-          <p className="text-muted-foreground">Loading aggregator...</p>
-        </div>
-      </div>
-    )
-  }
 
   const filteredPools = useMemo(() => {
     let filtered = pools
@@ -102,7 +88,7 @@ export default function RealAggregator() {
   }, [selectedPool, depositAmount, durationMonths])
 
   const handleFindOptimal = async () => {
-    if (!depositAmount || !isReady) return
+    if (!depositAmount) return
 
     try {
       const result = await findOptimal({
@@ -137,7 +123,6 @@ export default function RealAggregator() {
 
     const amount = parseFloat(depositAmount)
 
-    // Check wallet balance
     if (!isReady || !selectedAccount) {
       setExecutionStatus({
         type: 'error',
@@ -146,7 +131,6 @@ export default function RealAggregator() {
       return
     }
 
-    // Validate against wallet balance
     if (amount > totalPortfolioValue && !demoMode) {
       setExecutionStatus({
         type: 'error',
@@ -160,28 +144,28 @@ export default function RealAggregator() {
     setExecutionStatus({type: 'idle', message: ''})
 
     try {
-      // Simulate blockchain transaction delay
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      const strategy = {
-        id: Date.now().toString(),
-        tokenName: selectedPool.symbol,
-        amount: amount,
-        duration: durationMonths,
-        protocol: selectedPool.project,
-        apy: selectedPool.apy.toString(),
-        executedAt: new Date(),
-        wallet_address: selectedAccount.address,
-        status: demoMode ? 'demo' : 'active'
-      }
+      const strategy: ExecutedStrategy = {
+  id: Date.now().toString(),
+  tokenName: selectedPool.symbol,
+  amount,
+  duration: durationMonths,
+  protocol: selectedPool.project,
+  apy: selectedPool.apy.toString(),
+  executedAt: new Date(),
+  wallet_address: selectedAccount.address,
+  status: demoMode ? "demo" : "active"
+}
+
 
       addStrategy(strategy)
 
       setExecutionStatus({
         type: 'success',
         message: demoMode 
-          ? `Demo strategy created! This is for learning only and cannot be withdrawn.`
-          : `Successfully deployed ${depositAmount} ${selectedPool.symbol} to ${selectedPool.project}`
+          ? `Demo strategy created! This is for learning only.`
+          : `Successfully deployed ${depositAmount} ${selectedPool.symbol}`
       })
 
       setTimeout(() => {
@@ -202,8 +186,20 @@ export default function RealAggregator() {
     setShowBalanceModal(false)
     setExecutionStatus({
       type: 'success',
-      message: 'Demo Mode enabled. You can now create strategies for learning without real funds.'
+      message: 'Demo Mode enabled. You can now create strategies for learning.'
     })
+  }
+
+  // Don't render until mounted
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading aggregator...</p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -223,7 +219,7 @@ export default function RealAggregator() {
         <div>
           <h2 className="text-3xl font-bold mb-2">DeFi Aggregator</h2>
           <p className="text-muted-foreground">
-            Real-time opportunities from {metadata.chains?.length || 0} Polkadot parachains
+            {useMockData ? 'Demo data - API temporarily unavailable' : `Real-time opportunities from ${metadata.chains?.length || 0} Polkadot parachains`}
             {demoMode && <span className="ml-2 text-secondary font-semibold">(Demo Mode)</span>}
           </p>
         </div>
@@ -234,11 +230,10 @@ export default function RealAggregator() {
           className="flex items-center gap-2"
         >
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Data
+          Refresh
         </Button>
       </div>
 
-      {/* Wallet Balance Display */}
       {isReady && selectedAccount && (
         <Card className="backdrop-blur-xl bg-accent/10 border border-accent/30 p-6 rounded-lg">
           <div className="flex items-center justify-between">
@@ -246,7 +241,7 @@ export default function RealAggregator() {
               <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
               <p className="text-3xl font-bold text-accent">${totalPortfolioValue.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Across {balances.length} chains • {demoMode ? 'Demo Mode Active' : 'Real Funds'}
+                Across {balances.length} chains • {demoMode ? 'Demo Mode' : 'Real Funds'}
               </p>
             </div>
             <Wallet className="w-10 h-10 text-accent opacity-50" />
@@ -254,7 +249,6 @@ export default function RealAggregator() {
         </Card>
       )}
 
-      {/* Live Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
           <div className="flex items-center justify-between">
@@ -294,14 +288,13 @@ export default function RealAggregator() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Last Updated</p>
-              <LastUpdated timestamp={metadata.lastUpdated || undefined} />
+              <LastUpdated timestamp={metadata.lastUpdated} />
             </div>
             <RefreshCw className="w-8 h-8 text-muted-foreground opacity-50" />
           </div>
         </Card>
       </div>
 
-      {/* Status Messages */}
       {executionStatus.type !== 'idle' && (
         <Card className={`backdrop-blur-xl border p-4 rounded-lg ${
           executionStatus.type === 'success' 
@@ -323,7 +316,6 @@ export default function RealAggregator() {
         </Card>
       )}
 
-      {/* Balance Warning Modal */}
       <Dialog open={showBalanceModal} onOpenChange={setShowBalanceModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -335,38 +327,18 @@ export default function RealAggregator() {
           <div className="space-y-4">
             <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
               <p className="text-sm">
-                Deposit Amount: <strong>${parseFloat(depositAmount || "0").toFixed(2)}</strong>
+                Amount: <strong>${parseFloat(depositAmount || "0").toFixed(2)}</strong>
               </p>
               <p className="text-sm">
-                Available Balance: <strong>${totalPortfolioValue.toFixed(2)}</strong>
-              </p>
-              <p className="text-sm text-destructive mt-2">
-                Shortfall: <strong>${Math.max(0, parseFloat(depositAmount || "0") - totalPortfolioValue).toFixed(2)}</strong>
+                Available: <strong>${totalPortfolioValue.toFixed(2)}</strong>
               </p>
             </div>
-            
-            <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg">
-              <p className="text-sm font-semibold mb-2">Options:</p>
-              <ul className="text-sm space-y-2">
-                <li>• Reduce the deposit amount to ${totalPortfolioValue.toFixed(2)} or less</li>
-                <li>• Use Demo Mode to practice without real funds</li>
-                <li>• Add more funds to your wallet first</li>
-              </ul>
-            </div>
-
             <div className="flex gap-3">
-              <Button
-                onClick={handleDemoMode}
-                className="flex-1 bg-secondary hover:bg-secondary/90"
-              >
+              <Button onClick={handleDemoMode} className="flex-1">
                 <Zap className="w-4 h-4 mr-2" />
-                Enable Demo Mode
+                Demo Mode
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowBalanceModal(false)}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={() => setShowBalanceModal(false)} className="flex-1">
                 Adjust Amount
               </Button>
             </div>
@@ -374,7 +346,6 @@ export default function RealAggregator() {
         </DialogContent>
       </Dialog>
 
-      {/* Search & Filters */}
       <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
         <div className="space-y-4">
           <div className="flex gap-4">
@@ -382,17 +353,13 @@ export default function RealAggregator() {
               <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search pools, protocols, or tokens..."
+                placeholder="Search pools..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50"
               />
             </div>
-            <Button 
-              onClick={handleFindOptimal}
-              disabled={findingOptimal || !depositAmount}
-              className="bg-primary hover:bg-primary/90"
-            >
+            <Button onClick={handleFindOptimal} disabled={!depositAmount || findingOptimal}>
               <Zap className="w-4 h-4 mr-2" />
               {findingOptimal ? 'Finding...' : 'Find Optimal'}
             </Button>
@@ -416,56 +383,61 @@ export default function RealAggregator() {
         </div>
 
         <div className="mt-6 space-y-3">
-          {filteredPools.map((pool, idx) => (
-            <div
-              key={`${pool.chain}-${pool.project}-${idx}`}
-              onClick={() => setSelectedPool(pool)}
-              className={`p-4 rounded-lg cursor-pointer transition-all border ${
-                selectedPool?.symbol === pool.symbol && selectedPool?.chain === pool.chain
-                  ? "bg-primary/20 border-primary backdrop-blur-xl"
-                  : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-semibold text-base">{pool.symbol} {pool.project}</h4>
-                    <span className="text-xs px-2 py-1 rounded bg-secondary/20 text-secondary">
-                      {pool.chain}
-                    </span>
-                    <Shield className="w-4 h-4 text-accent" />
+          {filteredPools.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No pools found matching your criteria</p>
+            </div>
+          ) : (
+            filteredPools.map((pool, idx) => (
+              <div
+                key={`${pool.chain}-${pool.project}-${idx}`}
+                onClick={() => setSelectedPool(pool)}
+                className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                  selectedPool?.symbol === pool.symbol && selectedPool?.chain === pool.chain
+                    ? "bg-primary/20 border-primary backdrop-blur-xl"
+                    : "bg-card/50 border-border/50 hover:border-primary/50 backdrop-blur-xl hover:bg-card/60"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-semibold text-base">{pool.symbol} {pool.project}</h4>
+                      <span className="text-xs px-2 py-1 rounded bg-secondary/20 text-secondary">
+                        {pool.chain}
+                      </span>
+                      <Shield className="w-4 h-4 text-accent" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{pool.project}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{pool.project}</p>
-                </div>
 
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">APY</p>
-                    <p className="text-xl font-bold text-accent">{pool.apy.toFixed(2)}%</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">TVL</p>
-                    <p className="text-sm font-semibold">
-                      ${(pool.tvlUsd / 1e6).toFixed(2)}M
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Risk Score</p>
-                    <p className={`text-sm font-bold ${
-                      pool.riskScore >= 70 ? 'text-accent' :
-                      pool.riskScore >= 40 ? 'text-secondary' : 'text-destructive'
-                    }`}>
-                      {pool.riskScore}/100
-                    </p>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">APY</p>
+                      <p className="text-xl font-bold text-accent">{pool.apy.toFixed(2)}%</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">TVL</p>
+                      <p className="text-sm font-semibold">
+                        ${(pool.tvlUsd / 1e6).toFixed(2)}M
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Risk Score</p>
+                      <p className={`text-sm font-bold ${
+                        pool.riskScore >= 70 ? 'text-accent' :
+                        pool.riskScore >= 40 ? 'text-secondary' : 'text-destructive'
+                      }`}>
+                        {pool.riskScore}/100
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
 
-      {/* Strategy Builder */}
       {selectedPool && (
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg">
           <h3 className="text-2xl font-bold mb-6">Build Your Strategy</h3>

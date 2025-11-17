@@ -1,9 +1,8 @@
-// ============================================
-// FILE: app/dashboard/vaults/page.tsx
+// FILE: app/dashboard/vaults/page.tsx (WITH DEMO SUPPORT)
 "use client"
 
 import { useState } from "react"
-import { Lock, TrendingUp, Users, Zap, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Lock, TrendingUp, Zap, AlertCircle, CheckCircle2, GraduationCap, Trash2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
@@ -11,7 +10,7 @@ import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
 import { useLivePools } from "@/hooks/use-live-pools"
 
 export default function Vaults() {
-  const { strategies } = useStrategyVaults()
+  const { strategies, removeStrategy, getRealStats } = useStrategyVaults()
   const { selectedAccount, isReady } = usePolkadotExtension()
   const { pools, loading: poolsLoading } = useLivePools()
   const [selectedVault, setSelectedVault] = useState<number | null>(null)
@@ -23,8 +22,12 @@ export default function Vaults() {
     message: ''
   })
 
+  // Get real stats (excluding demos)
+  const realStats = getRealStats()
+
   // Combine live pools with user strategies
   const userVaults = strategies.map((s) => ({
+    id: s.id,
     name: `${s.tokenName} - ${s.protocol}`,
     chain: s.protocol,
     apy: `${s.apy}%`,
@@ -35,10 +38,12 @@ export default function Vaults() {
     strategy: `${s.duration}-month strategy via ${s.protocol}`,
     minStake: "0.1",
     isUserVault: true,
+    isDemo: s.isDemo || s.status === 'demo',
     executedAt: s.executedAt,
   }))
 
-  const liveVaults = pools.slice(0, 6).map(pool => ({
+  const liveVaults = pools.slice(0, 6).map((pool, idx) => ({
+    id: `pool-${pool.chain}-${pool.project}-${pool.symbol}-${idx}`,
     name: `${pool.symbol} ${pool.project}`,
     chain: pool.chain,
     apy: `${pool.apy.toFixed(2)}%`,
@@ -49,20 +54,10 @@ export default function Vaults() {
     strategy: pool.project,
     minStake: "0.1",
     isUserVault: false,
+    isDemo: false,
   }))
 
   const allVaults = [...userVaults, ...liveVaults]
-
-  // Calculate stats from real data
-  const totalDeposited = strategies.reduce((sum, s) => sum + s.amount, 0)
-  const totalEarned = strategies.reduce((sum, s) => 
-    sum + (s.amount * parseFloat(s.apy) / 100 * (s.duration / 12)), 0
-  )
-  const avgAPY = strategies.length > 0
-    ? strategies.reduce((sum, s) => sum + parseFloat(s.apy), 0) / strategies.length
-    : pools.length > 0 
-      ? pools.reduce((sum, p) => sum + p.apy, 0) / pools.length
-      : 0
 
   const handleStake = async () => {
     if (!selectedAccount || !depositAmount || selectedVault === null) {
@@ -99,22 +94,14 @@ export default function Vaults() {
     }
   }
 
-  const handleWithdraw = async () => {
-    if (!selectedAccount || !withdrawAmount) {
-      setStakingStatus({type: 'error', message: 'Please enter withdrawal amount'})
-      return
-    }
-
-    setIsStaking(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStakingStatus({type: 'success', message: `Successfully withdrew ${withdrawAmount}`})
-      setWithdrawAmount("")
-      setTimeout(() => setStakingStatus({type: 'idle', message: ''}), 5000)
-    } catch (error) {
-      setStakingStatus({type: 'error', message: 'Withdrawal failed. Please try again.'})
-    } finally {
-      setIsStaking(false)
+  const handleRemoveDemo = (vaultId: string) => {
+    if (confirm('Remove this demo strategy?')) {
+      removeStrategy(vaultId)
+      setStakingStatus({
+        type: 'success',
+        message: 'Demo strategy removed'
+      })
+      setTimeout(() => setStakingStatus({type: 'idle', message: ''}), 3000)
     }
   }
 
@@ -155,13 +142,14 @@ export default function Vaults() {
         </Card>
       )}
 
-      {/* Real Summary Stats */}
+      {/* Real Stats (Excluding Demos) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Deposited</p>
-              <p className="text-2xl font-bold">${totalDeposited.toFixed(2)}</p>
+              <p className="text-2xl font-bold">${realStats.totalDeposited.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Real strategies only</p>
             </div>
             <Lock className="w-8 h-8 text-primary opacity-50" />
           </div>
@@ -171,7 +159,8 @@ export default function Vaults() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Earned</p>
-              <p className="text-2xl font-bold">${totalEarned.toFixed(2)}</p>
+              <p className="text-2xl font-bold">${realStats.totalEarned.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground mt-1">From active vaults</p>
             </div>
             <TrendingUp className="w-8 h-8 text-accent opacity-50" />
           </div>
@@ -181,14 +170,14 @@ export default function Vaults() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Avg APY</p>
-              <p className="text-2xl font-bold">{avgAPY.toFixed(1)}%</p>
+              <p className="text-2xl font-bold">{realStats.avgAPY.toFixed(1)}%</p>
+              <p className="text-xs text-muted-foreground mt-1">{realStats.count} active positions</p>
             </div>
             <Zap className="w-8 h-8 text-secondary opacity-50" />
           </div>
         </Card>
       </div>
 
-      {/* Loading State */}
       {poolsLoading && (
         <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg text-center">
           <p className="text-muted-foreground">Loading live vault data...</p>
@@ -199,29 +188,51 @@ export default function Vaults() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {allVaults.map((vault, idx) => (
           <Card
-            key={idx}
+            key={vault.id || idx}
             onClick={() => setSelectedVault(idx)}
             className={`backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg cursor-pointer transition-all ${
               selectedVault === idx ? "ring-2 ring-primary" : "hover:border-primary/50"
-            }`}
+            } ${vault.isDemo ? 'border-secondary/50' : ''}`}
           >
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold">{vault.name}</h3>
                 <p className="text-sm text-muted-foreground">{vault.chain}</p>
-                {vault.isUserVault && (
-                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full mt-1 inline-block">
-                    Your Position
-                  </span>
+                <div className="flex gap-2 mt-2">
+                  {vault.isUserVault && !vault.isDemo && (
+                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full inline-block">
+                      Your Position
+                    </span>
+                  )}
+                  {vault.isDemo && (
+                    <span className="text-xs bg-secondary/20 text-secondary px-2 py-1 rounded-full inline-flex items-center gap-1">
+                      <GraduationCap className="w-3 h-3" />
+                      Demo Mode
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                  vault.risk === "Low" ? "bg-accent/20 text-accent" : 
+                  vault.risk === "Medium" ? "bg-secondary/20 text-secondary" :
+                  "bg-destructive/20 text-destructive"
+                }`}>
+                  {vault.risk} Risk
+                </span>
+                {vault.isDemo && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemoveDemo(vault.id)
+                    }}
+                    className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                    title="Remove demo strategy"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </button>
                 )}
               </div>
-              <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                vault.risk === "Low" ? "bg-accent/20 text-accent" : 
-                vault.risk === "Medium" ? "bg-secondary/20 text-secondary" :
-                "bg-destructive/20 text-destructive"
-              }`}>
-                {vault.risk} Risk
-              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -252,11 +263,19 @@ export default function Vaults() {
               <p className="text-sm font-medium">{vault.strategy}</p>
             </div>
 
+            {vault.isDemo && (
+              <div className="p-3 bg-secondary/10 border border-secondary/30 rounded-lg mb-4">
+                <p className="text-xs text-secondary">
+                  🎓 <strong>Demo Strategy:</strong> This is for learning only and does not involve real funds.
+                </p>
+              </div>
+            )}
+
             <Button 
               className="w-full bg-primary hover:bg-primary/90 text-sm"
-              disabled={!isReady}
+              disabled={!isReady || vault.isDemo}
             >
-              {vault.isUserVault ? "Manage Position" : "Deposit"}
+              {vault.isDemo ? "Demo Only" : vault.isUserVault ? "Manage Position" : "Deposit"}
             </Button>
           </Card>
         ))}
@@ -340,7 +359,6 @@ export default function Vaults() {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={handleWithdraw}
                   disabled={!isReady || isStaking || !withdrawAmount || !allVaults[selectedVault].isUserVault}
                 >
                   {isStaking ? "Processing..." : "Withdraw"}
