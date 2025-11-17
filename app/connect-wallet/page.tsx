@@ -1,4 +1,4 @@
-// FILE: app/connect-wallet/page.tsx
+// FILE: app/connect-wallet/page.tsx (NO AUTO-CONNECT, MANUAL ONLY)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Wallet, CheckCircle2, AlertCircle, Loader2, ExternalLink, Shield } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
+import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
 import { useWalletBalance } from "@/hooks/use-wallet-balance"
 import Link from "next/link"
 
@@ -37,13 +37,14 @@ const WALLET_OPTIONS = [
 export default function ConnectWallet() {
   const router = useRouter()
   const { 
-    accounts, 
+    connectedAccounts,
     selectedAccount, 
-    selectAccount, 
+    switchAccount,
     connectWallet, 
-    isReady, 
+    isReady,
+    isConnecting,
     error: walletError 
-  } = usePolkadotExtension()
+  } = useEnhancedPolkadot()
   
   const { 
     balances, 
@@ -51,35 +52,28 @@ export default function ConnectWallet() {
     loading: balancesLoading 
   } = useWalletBalance()
 
-  const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // NO AUTO-CONNECT - User must click button
   useEffect(() => {
-    // Auto-connect if extension is available
-    if (!isReady && !walletError) {
-      handleConnect()
-    }
+    console.log('[ConnectWallet] Page loaded. Waiting for user to click Connect button.')
   }, [])
 
   const handleConnect = async () => {
-    setConnecting(true)
     setError(null)
 
     try {
+      console.log('[ConnectWallet] User clicked Connect - triggering wallet popup...')
       await connectWallet()
-      // Connection successful - accounts should now be available
     } catch (err) {
-      console.error("Connection error:", err)
+      console.error("[ConnectWallet] Connection error:", err)
       setError(err instanceof Error ? err.message : "Failed to connect wallet")
-    } finally {
-      setConnecting(false)
     }
   }
 
   const handleSelectAccount = (address: string) => {
-  const account = accounts.find(a => a.address === address)
-  if (account) selectAccount(account) // ✅ pass full object
-}
+    switchAccount(address)
+  }
 
   const handleContinue = () => {
     if (selectedAccount) {
@@ -101,19 +95,19 @@ export default function ConnectWallet() {
           </p>
         </div>
 
-        {/* Connection Status */}
-        {!isReady && !connecting && (
+        {/* No Extension / Need to Install */}
+        {!isReady && !isConnecting && connectedAccounts.length === 0 && (
           <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg mb-6">
             <div className="flex items-center gap-3 mb-6">
               <AlertCircle className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">No Wallet Extension Detected</h3>
+              <h3 className="text-lg font-semibold">Wallet Extension Required</h3>
             </div>
 
             <p className="text-muted-foreground mb-6">
-              To use DotVest, you'll need a Polkadot-compatible wallet extension. Choose one below:
+              To use DotVest, install a Polkadot-compatible wallet extension:
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {WALLET_OPTIONS.map((wallet) => (
                 <a
                   key={wallet.id}
@@ -136,36 +130,86 @@ export default function ConnectWallet() {
               ))}
             </div>
 
-            <div className="mt-6 p-4 bg-accent/10 border border-accent/30 rounded-lg">
+            <div className="p-4 bg-accent/10 border border-accent/30 rounded-lg mb-4">
               <p className="text-sm text-accent flex items-center gap-2">
                 <Shield className="w-4 h-4" />
-                After installing, refresh this page to connect your wallet
+                After installing, click the button below to connect
               </p>
             </div>
+
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </>
+              )}
+            </Button>
+          </Card>
+        )}
+
+        {/* Extension Detected but Not Connected */}
+        {isReady && connectedAccounts.length === 0 && !isConnecting && (
+          <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg mb-6">
+            <div className="flex items-center gap-3 mb-6">
+              <CheckCircle2 className="w-5 h-5 text-accent" />
+              <h3 className="text-lg font-semibold">Wallet Extension Detected</h3>
+            </div>
+
+            <p className="text-muted-foreground mb-6">
+              Click the button below to connect your wallet and authorize DotVest.
+            </p>
+
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </>
+              )}
+            </Button>
           </Card>
         )}
 
         {/* Connecting State */}
-        {connecting && (
+        {isConnecting && (
           <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg mb-6">
             <div className="text-center">
               <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
               <h3 className="text-lg font-semibold mb-2">Connecting to Wallet...</h3>
               <p className="text-muted-foreground">
-                Please approve the connection request in your wallet extension
+                Please approve the connection request in your wallet extension popup
               </p>
             </div>
           </Card>
         )}
 
         {/* Error State */}
-        {error && (
+        {(error || walletError) && (
           <Card className="backdrop-blur-xl bg-destructive/10 border border-destructive/50 p-4 rounded-lg mb-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-destructive" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-destructive">Connection Failed</p>
-                <p className="text-xs text-destructive/80">{error}</p>
+                <p className="text-xs text-destructive/80">{error || walletError}</p>
               </div>
               <Button 
                 size="sm" 
@@ -179,32 +223,32 @@ export default function ConnectWallet() {
           </Card>
         )}
 
-        {/* Connected State - Account Selection */}
-        {isReady && accounts && accounts.length > 0 && (
+        {/* Account Selection - After Connection */}
+        {connectedAccounts.length > 0 && (
           <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg mb-6">
             <div className="flex items-center gap-3 mb-6">
               <CheckCircle2 className="w-5 h-5 text-accent" />
-              <h3 className="text-lg font-semibold">Wallet Connected</h3>
+              <h3 className="text-lg font-semibold">Select Account</h3>
             </div>
 
             <p className="text-muted-foreground mb-4">
-              Select an account to continue:
+              Choose which account you'd like to use with DotVest:
             </p>
 
             <div className="space-y-3 mb-6">
-              {accounts.map((account) => {
+              {connectedAccounts.map((account, idx) => {
                 const isSelected = selectedAccount?.address === account.address
                 const accountBalance = balances.find(b => 
-                  b.tokens.some(t => t.chain === "Polkadot")
+                  b.tokens.some(t => t.chain === "Polkadot" || t.chain === "Asset Hub")
                 )
                 
                 return (
                   <div
-                    key={account.address}
+                    key={`${account.address}-${idx}`}
                     onClick={() => handleSelectAccount(account.address)}
                     className={`p-4 rounded-lg border cursor-pointer transition-all ${
                       isSelected
-                        ? "bg-primary/20 border-primary"
+                        ? "bg-primary/20 border-primary shadow-lg shadow-primary/20"
                         : "bg-card/50 border-border/50 hover:border-primary/50"
                     }`}
                   >
@@ -213,24 +257,27 @@ export default function ConnectWallet() {
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                             <span className="text-sm font-bold text-primary-foreground">
-                              {account.meta.name?.charAt(0).toUpperCase() || "?"}
+                              {account.name?.charAt(0).toUpperCase() || "?"}
                             </span>
                           </div>
                           <div>
-                            <p className="font-semibold">{account.meta.name || "Unnamed Account"}</p>
+                            <p className="font-semibold">{account.name || "Unnamed Account"}</p>
                             <p className="text-xs text-muted-foreground font-mono">
                               {account.address.slice(0, 10)}...{account.address.slice(-8)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              via {account.source}
                             </p>
                           </div>
                         </div>
                         
                         {/* Balance Info */}
-                        {balancesLoading ? (
+                        {isSelected && balancesLoading ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             Loading balances...
                           </div>
-                        ) : accountBalance ? (
+                        ) : isSelected && accountBalance ? (
                           <div className="flex gap-4 text-xs">
                             {accountBalance.tokens.map((token) => (
                               <div key={token.symbol}>
@@ -287,7 +334,7 @@ export default function ConnectWallet() {
                 onClick={handleConnect}
                 className="bg-transparent"
               >
-                Refresh
+                Connect Different Wallet
               </Button>
             </div>
           </Card>

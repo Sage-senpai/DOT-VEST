@@ -15,14 +15,13 @@ export interface TokenBalance {
 
 export interface ChainBalance {
   chain: string
-  rpcUrl: string
+  rpcUrls: string
   tokens: TokenBalance[]
   totalUsdValue: number
 }
-
 interface ChainConfig {
   name: string
-  rpcUrl: string
+  rpcUrls: string
   symbol: string
   decimals: number
   coingeckoId: string
@@ -34,44 +33,59 @@ type ChainKey = 'polkadot' | 'assethub' | 'acala' | 'hydration' | 'bifrost'
 const CHAIN_CONFIGS: Record<ChainKey, ChainConfig> = {
   polkadot: {
     name: 'Polkadot Relay',
-    rpcUrl: process.env.NEXT_PUBLIC_POLKADOT_RPC_URL || 'wss://rpc.polkadot.io',
-    symbol: 'DOT',
-    decimals: 10,
-    coingeckoId: 'polkadot'
-  },
-  assethub: {
-    name: 'Asset Hub',
-    rpcUrl: 'wss://polkadot-asset-hub-rpc.polkadot.io',
+    rpcUrls:
+      process.env.NEXT_PUBLIC_POLKADOT_RPC_URL ||
+      'wss://rpc.polkadot.io', // OFFICIAL
     symbol: 'DOT',
     decimals: 10,
     coingeckoId: 'polkadot',
-    isAssetHub: true
   },
+
+  assethub: {
+    name: 'Asset Hub',
+    rpcUrls:
+      process.env.NEXT_PUBLIC_ASSET_HUB_RPC_URL ||
+      'wss://polkadot-asset-hub-rpc.polkadot.io', // OFFICIAL
+    symbol: 'DOT',
+    decimals: 10,
+    coingeckoId: 'polkadot',
+    isAssetHub: true,
+  },
+
   acala: {
     name: 'Acala',
-    rpcUrl: process.env.NEXT_PUBLIC_ACALA_RPC_URL || 'wss://acala-rpc.dwellir.com',
+    rpcUrls:
+      process.env.NEXT_PUBLIC_ACALA_RPC_URL ||
+      'wss://acala-rpc.aca-api.network', // MOST STABLE ENDPOINT
     symbol: 'ACA',
     decimals: 12,
-    coingeckoId: 'acala'
+    coingeckoId: 'acala',
   },
+
   hydration: {
     name: 'Hydration',
-    rpcUrl: process.env.NEXT_PUBLIC_HYDRATION_RPC_URL || 'wss://rpc.hydradx.cloud',
+    rpcUrls:
+      process.env.NEXT_PUBLIC_HYDRATION_RPC_URL ||
+      'wss://hydration-rpc.hydradx.cloud', // CONFIRMED WORKING
     symbol: 'HDX',
     decimals: 12,
-    coingeckoId: 'hydration'
+    coingeckoId: 'hydration',
   },
+
   bifrost: {
     name: 'Bifrost',
-    rpcUrl: process.env.NEXT_PUBLIC_BIFROST_RPC_URL || 'wss://bifrost-rpc.dwellir.com',
+    rpcUrls:
+      process.env.NEXT_PUBLIC_BIFROST_RPC_URL ||
+      'wss://bifrost-polkadot.api.onfinality.io/public-ws', // MOST RELIABLE
     symbol: 'BNC',
     decimals: 12,
-    coingeckoId: 'bifrost-native-coin'
+    coingeckoId: 'bifrost-native-coin',
   },
 }
 
 let priceCache: { [key: string]: { price: number; timestamp: number } } = {}
 const PRICE_CACHE_TTL = 5 * 60 * 1000
+
 
 async function fetchRealPrices(): Promise<{ [key: string]: number }> {
   try {
@@ -145,7 +159,7 @@ export function useWalletBalance() {
       const { ApiPromise, WsProvider } = await import('@polkadot/api')
       const { formatBalance } = await import('@polkadot/util')
       
-      const provider = new WsProvider(config.rpcUrl)
+      const provider = new WsProvider(config.rpcUrls)
       const api = await ApiPromise.create({ provider })
 
       const accountInfo: any = await api.query.system.account(address)
@@ -170,7 +184,7 @@ export function useWalletBalance() {
 
       return {
         chain: config.name,
-        rpcUrl: config.rpcUrl,
+        rpcUrls: config.rpcUrls,
         tokens: [{
           token: config.name,
           symbol: config.symbol,

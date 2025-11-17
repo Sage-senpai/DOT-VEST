@@ -1,371 +1,268 @@
-// FILE: app/dashboard/vaults/page.tsx (WITH DEMO SUPPORT)
+// FILE: app/dashboard/vaults/page.tsx (FIXED - Shows Total Deposits)
 "use client"
 
-import { useState } from "react"
-import { Lock, TrendingUp, Zap, AlertCircle, CheckCircle2, GraduationCap, Trash2 } from "lucide-react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useStrategyVaults } from "@/hooks/use-strategy-vaults"
-import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
-import { useLivePools } from "@/hooks/use-live-pools"
+import { useState, useEffect } from 'react'
+import { Lock, TrendingUp, Clock, Shield, Plus, Search, Filter, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useDashboardState } from '@/hooks/use-dashboard-state'
 
-export default function Vaults() {
-  const { strategies, removeStrategy, getRealStats } = useStrategyVaults()
-  const { selectedAccount, isReady } = usePolkadotExtension()
-  const { pools, loading: poolsLoading } = useLivePools()
-  const [selectedVault, setSelectedVault] = useState<number | null>(null)
-  const [depositAmount, setDepositAmount] = useState("")
-  const [withdrawAmount, setWithdrawAmount] = useState("")
-  const [isStaking, setIsStaking] = useState(false)
-  const [stakingStatus, setStakingStatus] = useState<{type: 'idle' | 'success' | 'error', message: string}>({
-    type: 'idle',
-    message: ''
+interface Vault {
+  id: string
+  name: string
+  deposited: number
+  earned: number
+  apy: number
+  chain: string
+  status: 'active' | 'paused'
+  wallet_address: string
+  isDemo?: boolean
+}
+
+export default function VaultsPage() {
+  const { vaults, isWalletConnected, walletAddress, addVault, refreshData } = useDashboardState()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterChain, setFilterChain] = useState<string>('all')
+  const [showAddModal, setShowAddModal] = useState(false)
+
+  // Demo vaults for non-connected users
+  const demoVaults: Vault[] = [
+    {
+      id: 'demo-1',
+      name: 'DOT Staking Vault',
+      deposited: 1000,
+      earned: 125,
+      apy: 12.5,
+      chain: 'Polkadot',
+      status: 'active',
+      wallet_address: 'demo',
+      isDemo: true
+    },
+    {
+      id: 'demo-2',
+      name: 'ACA Liquid Staking',
+      deposited: 5000,
+      earned: 450,
+      apy: 9.0,
+      chain: 'Acala',
+      status: 'active',
+      wallet_address: 'demo',
+      isDemo: true
+    }
+  ]
+
+  const displayVaults = isWalletConnected ? vaults : demoVaults
+  const chains = ['all', ...new Set(displayVaults.map(v => v.chain))]
+
+  const filteredVaults = displayVaults.filter(vault => {
+    const matchesSearch = vault.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesChain = filterChain === 'all' || vault.chain === filterChain
+    return matchesSearch && matchesChain
   })
 
-  // Get real stats (excluding demos)
-  const realStats = getRealStats()
-
-  // Combine live pools with user strategies
-  const userVaults = strategies.map((s) => ({
-    id: s.id,
-    name: `${s.tokenName} - ${s.protocol}`,
-    chain: s.protocol,
-    apy: `${s.apy}%`,
-    tvl: `${(parseFloat(s.apy) * 1000).toFixed(1)}K`,
-    deposited: `${s.amount} ${s.tokenName.replace(" POOL", "")}`,
-    earned: `${((s.amount * parseFloat(s.apy) * (s.duration / 12)) / 100).toFixed(2)} ${s.tokenName.replace(" POOL", "")}`,
-    risk: s.duration <= 3 ? "Low" : "Medium",
-    strategy: `${s.duration}-month strategy via ${s.protocol}`,
-    minStake: "0.1",
-    isUserVault: true,
-    isDemo: s.isDemo || s.status === 'demo',
-    executedAt: s.executedAt,
-  }))
-
-  const liveVaults = pools.slice(0, 6).map((pool, idx) => ({
-    id: `pool-${pool.chain}-${pool.project}-${pool.symbol}-${idx}`,
-    name: `${pool.symbol} ${pool.project}`,
-    chain: pool.chain,
-    apy: `${pool.apy.toFixed(2)}%`,
-    tvl: `$${(pool.tvlUsd / 1e6).toFixed(2)}M`,
-    deposited: "0",
-    earned: "0",
-    risk: pool.riskScore > 7 ? "Low" : pool.riskScore > 4 ? "Medium" : "High",
-    strategy: pool.project,
-    minStake: "0.1",
-    isUserVault: false,
-    isDemo: false,
-  }))
-
-  const allVaults = [...userVaults, ...liveVaults]
-
-  const handleStake = async () => {
-    if (!selectedAccount || !depositAmount || selectedVault === null) {
-      setStakingStatus({type: 'error', message: 'Please connect wallet and enter amount'})
-      return
-    }
-
-    const vault = allVaults[selectedVault]
-    const amount = parseFloat(depositAmount)
-    const minStake = parseFloat(vault.minStake || "0")
-
-    if (amount < minStake) {
-      setStakingStatus({type: 'error', message: `Minimum stake is ${vault.minStake}`})
-      return
-    }
-
-    setIsStaking(true)
-    setStakingStatus({type: 'idle', message: ''})
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      setStakingStatus({
-        type: 'success',
-        message: `Successfully staked ${depositAmount} in ${vault.name}`
-      })
-      setDepositAmount("")
-      
-      setTimeout(() => setStakingStatus({type: 'idle', message: ''}), 5000)
-    } catch (error) {
-      setStakingStatus({type: 'error', message: 'Staking failed. Please try again.'})
-    } finally {
-      setIsStaking(false)
-    }
-  }
-
-  const handleRemoveDemo = (vaultId: string) => {
-    if (confirm('Remove this demo strategy?')) {
-      removeStrategy(vaultId)
-      setStakingStatus({
-        type: 'success',
-        message: 'Demo strategy removed'
-      })
-      setTimeout(() => setStakingStatus({type: 'idle', message: ''}), 3000)
-    }
-  }
+  // Calculate totals
+  const totalDeposited = displayVaults.reduce((sum, v) => sum + v.deposited, 0)
+  const totalEarned = displayVaults.reduce((sum, v) => sum + v.earned, 0)
+  const avgAPY = displayVaults.length > 0
+    ? displayVaults.reduce((sum, v) => sum + v.apy, 0) / displayVaults.length
+    : 0
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Vaults & Staking</h2>
-        <p className="text-muted-foreground">Deposit into optimized vaults and earn passive yield</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Vaults
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {isWalletConnected 
+              ? 'Secure your assets with automated yield strategies'
+              : '(Demo Mode - Connect wallet to access real vaults)'
+            }
+          </p>
+        </div>
+        {isWalletConnected && (
+          <Button onClick={() => setShowAddModal(true)} className="bg-primary hover:bg-primary/90">
+            <Plus className="w-4 h-4 mr-2" />
+            New Vault
+          </Button>
+        )}
       </div>
 
-      {!isReady && (
-        <Card className="backdrop-blur-xl bg-destructive/10 border border-destructive/50 p-4 rounded-lg">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-6 backdrop-blur-xl bg-card/40 border-border/50">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive" />
-            <p className="text-sm text-destructive">
-              Please connect your Polkadot wallet to stake and manage vaults
+            <div className="p-3 rounded-lg bg-primary/10">
+              <Lock className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Active Vaults</p>
+              <p className="text-2xl font-bold">{displayVaults.filter(v => v.status === 'active').length}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 backdrop-blur-xl bg-card/40 border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-accent/10">
+              <TrendingUp className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Deposited</p>
+              <p className="text-2xl font-bold">${totalDeposited.toLocaleString()}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 backdrop-blur-xl bg-card/40 border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-green-500/10">
+              <TrendingUp className="w-5 h-5 text-green-500" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Earned</p>
+              <p className="text-2xl font-bold text-green-500">${totalEarned.toLocaleString()}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 backdrop-blur-xl bg-card/40 border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-blue-500/10">
+              <Clock className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Avg. APY</p>
+              <p className="text-2xl font-bold">{avgAPY.toFixed(2)}%</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="p-4 backdrop-blur-xl bg-card/40 border-border/50">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search vaults..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-background/50 border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <select
+              value={filterChain}
+              onChange={(e) => setFilterChain(e.target.value)}
+              className="px-4 py-2 bg-background/50 border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              {chains.map(chain => (
+                <option key={chain} value={chain}>
+                  {chain === 'all' ? 'All Chains' : chain}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Vaults Grid */}
+      {!isWalletConnected && (
+        <Card className="p-4 backdrop-blur-xl bg-accent/10 border-accent/30">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-accent" />
+            <p className="text-sm text-muted-foreground">
+              You're viewing demo data. Connect your wallet to access real vaults and start earning.
             </p>
           </div>
         </Card>
       )}
 
-      {stakingStatus.type !== 'idle' && (
-        <Card className={`backdrop-blur-xl border p-4 rounded-lg ${
-          stakingStatus.type === 'success' 
-            ? 'bg-accent/10 border-accent/50' 
-            : 'bg-destructive/10 border-destructive/50'
-        }`}>
-          <div className="flex items-center gap-3">
-            {stakingStatus.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-accent" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-destructive" />
-            )}
-            <p className={`text-sm ${stakingStatus.type === 'success' ? 'text-accent' : 'text-destructive'}`}>
-              {stakingStatus.message}
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {/* Real Stats (Excluding Demos) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Deposited</p>
-              <p className="text-2xl font-bold">${realStats.totalDeposited.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Real strategies only</p>
-            </div>
-            <Lock className="w-8 h-8 text-primary opacity-50" />
-          </div>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Earned</p>
-              <p className="text-2xl font-bold">${realStats.totalEarned.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground mt-1">From active vaults</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-accent opacity-50" />
-          </div>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Avg APY</p>
-              <p className="text-2xl font-bold">{realStats.avgAPY.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground mt-1">{realStats.count} active positions</p>
-            </div>
-            <Zap className="w-8 h-8 text-secondary opacity-50" />
-          </div>
-        </Card>
-      </div>
-
-      {poolsLoading && (
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg text-center">
-          <p className="text-muted-foreground">Loading live vault data...</p>
-        </Card>
-      )}
-
-      {/* Vaults Grid - Real Data */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {allVaults.map((vault, idx) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredVaults.map((vault) => (
           <Card
-            key={vault.id || idx}
-            onClick={() => setSelectedVault(idx)}
-            className={`backdrop-blur-xl bg-card/40 border border-border/50 p-6 rounded-lg cursor-pointer transition-all ${
-              selectedVault === idx ? "ring-2 ring-primary" : "hover:border-primary/50"
-            } ${vault.isDemo ? 'border-secondary/50' : ''}`}
+            key={vault.id}
+            className="p-6 backdrop-blur-xl bg-card/40 border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10"
           >
             <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">{vault.name}</h3>
-                <p className="text-sm text-muted-foreground">{vault.chain}</p>
-                <div className="flex gap-2 mt-2">
-                  {vault.isUserVault && !vault.isDemo && (
-                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full inline-block">
-                      Your Position
-                    </span>
-                  )}
-                  {vault.isDemo && (
-                    <span className="text-xs bg-secondary/20 text-secondary px-2 py-1 rounded-full inline-flex items-center gap-1">
-                      <GraduationCap className="w-3 h-3" />
-                      Demo Mode
-                    </span>
-                  )}
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-gradient-to-br from-primary to-accent">
+                  <Lock className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{vault.name}</h3>
+                  <p className="text-xs text-muted-foreground">{vault.chain}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                  vault.risk === "Low" ? "bg-accent/20 text-accent" : 
-                  vault.risk === "Medium" ? "bg-secondary/20 text-secondary" :
-                  "bg-destructive/20 text-destructive"
-                }`}>
-                  {vault.risk} Risk
-                </span>
-                {vault.isDemo && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveDemo(vault.id)
-                    }}
-                    className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
-                    title="Remove demo strategy"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </button>
-                )}
-              </div>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                vault.status === 'active' 
+                  ? 'bg-accent/20 text-accent' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {vault.status}
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">APY</p>
-                <p className="text-xl font-bold text-accent">{vault.apy}</p>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Deposited</span>
+                <span className="font-semibold">${vault.deposited.toLocaleString()}</span>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">TVL</p>
-                <p className="text-xl font-bold">{vault.tvl}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Earned</span>
+                <span className="font-semibold text-green-500">${vault.earned.toLocaleString()}</span>
               </div>
-              {vault.isUserVault && (
-                <>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Your Deposit</p>
-                    <p className="text-lg font-semibold">{vault.deposited}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Earned</p>
-                    <p className="text-lg font-semibold text-accent">{vault.earned}</p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="p-3 bg-card/50 rounded-lg mb-4">
-              <p className="text-xs text-muted-foreground mb-1">Strategy</p>
-              <p className="text-sm font-medium">{vault.strategy}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">APY</span>
+                <span className="font-semibold text-primary">{vault.apy.toFixed(2)}%</span>
+              </div>
             </div>
 
             {vault.isDemo && (
-              <div className="p-3 bg-secondary/10 border border-secondary/30 rounded-lg mb-4">
-                <p className="text-xs text-secondary">
-                  🎓 <strong>Demo Strategy:</strong> This is for learning only and does not involve real funds.
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground text-center">
+                  Demo vault - Connect wallet to create real vaults
                 </p>
               </div>
             )}
 
-            <Button 
-              className="w-full bg-primary hover:bg-primary/90 text-sm"
-              disabled={!isReady || vault.isDemo}
-            >
-              {vault.isDemo ? "Demo Only" : vault.isUserVault ? "Manage Position" : "Deposit"}
-            </Button>
+            {!vault.isDemo && (
+              <div className="mt-4 pt-4 border-t border-border/50 flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1">
+                  Details
+                </Button>
+                <Button size="sm" className="flex-1 bg-primary hover:bg-primary/90">
+                  Manage
+                </Button>
+              </div>
+            )}
           </Card>
         ))}
       </div>
 
-      {/* Deposit/Withdraw Modal */}
-      {selectedVault !== null && (
-        <Card className="backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-lg">
-          <h3 className="text-2xl font-bold mb-6">{allVaults[selectedVault].name}</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-semibold mb-4">Deposit</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Amount</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder={`Min: ${allVaults[selectedVault].minStake}`}
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                      disabled={!isReady || isStaking}
-                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 disabled:opacity-50"
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      disabled={!isReady || isStaking}
-                      onClick={() => setDepositAmount("100")}
-                    >
-                      Max
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Est. Annual Yield</span>
-                    <span className="font-semibold text-accent">
-                      {depositAmount ? (parseFloat(depositAmount) * (parseFloat(allVaults[selectedVault].apy) / 100)).toFixed(2) : "0.00"} tokens
-                    </span>
-                  </div>
-                </div>
-
-                <Button 
-                  className="w-full bg-primary hover:bg-primary/90"
-                  onClick={handleStake}
-                  disabled={!isReady || isStaking || !depositAmount}
-                >
-                  {isStaking ? "Processing..." : "Stake Now"}
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Withdraw</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Amount</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      disabled={!isReady || isStaking || !allVaults[selectedVault].isUserVault}
-                      className="flex-1 px-4 py-2 bg-card/50 border border-border/50 rounded-lg text-sm focus:outline-none focus:border-primary/50 disabled:opacity-50"
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      disabled={!isReady || isStaking || !allVaults[selectedVault].isUserVault}
-                      onClick={() => setWithdrawAmount(allVaults[selectedVault].deposited.split(" ")[0])}
-                    >
-                      Max
-                    </Button>
-                  </div>
-                </div>
-
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  disabled={!isReady || isStaking || !withdrawAmount || !allVaults[selectedVault].isUserVault}
-                >
-                  {isStaking ? "Processing..." : "Withdraw"}
-                </Button>
-              </div>
-            </div>
-          </div>
+      {filteredVaults.length === 0 && (
+        <Card className="p-12 text-center backdrop-blur-xl bg-card/40 border-border/50">
+          <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No vaults found</h3>
+          <p className="text-muted-foreground mb-6">
+            {searchQuery || filterChain !== 'all'
+              ? 'Try adjusting your search or filters'
+              : isWalletConnected
+                ? 'Create your first vault to start earning'
+                : 'Connect your wallet to access vaults'
+            }
+          </p>
+          {isWalletConnected && (
+            <Button onClick={() => setShowAddModal(true)} className="bg-primary hover:bg-primary/90">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Vault
+            </Button>
+          )}
         </Card>
       )}
     </div>

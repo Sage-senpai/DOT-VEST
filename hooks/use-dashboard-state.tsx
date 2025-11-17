@@ -27,6 +27,7 @@ export interface DashboardVault {
   chain: string
   status: 'active' | 'paused'
   wallet_address: string
+  isDemo?: boolean
 }
 
 interface DashboardState {

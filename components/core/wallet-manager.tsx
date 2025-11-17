@@ -1,4 +1,4 @@
-// FILE: components/core/wallet-manager.tsx (FIXED)
+// FILE: components/core/wallet-manager.tsx (FIXED - Shows Connection State)
 import { useState, useEffect, useRef } from 'react'
 import { Wallet, ChevronDown, Check, X, LogOut, Edit2, Save, Plus, ExternalLink } from 'lucide-react'
 import { useEnhancedPolkadot } from '@/hooks/use-enhanced-polkadot'
@@ -19,7 +19,8 @@ export default function WalletManager() {
     switchAccount,
     disconnectWallet,
     saveCustomName,
-    supportedWallets
+    supportedWallets,
+    mounted
   } = useEnhancedPolkadot()
 
   useEffect(() => {
@@ -62,7 +63,15 @@ export default function WalletManager() {
     return account.customName || account.name || 'Unnamed Account'
   }
 
-  if (!selectedAccount) {
+  // Don't render until mounted (avoid hydration issues)
+  if (!mounted) {
+    return (
+      <div className="w-32 h-10 bg-card/50 border border-border/50 rounded-lg animate-pulse" />
+    )
+  }
+
+  // NOT CONNECTED STATE
+  if (!selectedAccount || connectedAccounts.length === 0) {
     return (
       <button
         onClick={() => connectWallet()}
@@ -84,16 +93,17 @@ export default function WalletManager() {
     )
   }
 
+  // CONNECTED STATE
   return (
     <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all duration-300 bg-card dark:bg-card/50 border border-border dark:border-border/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
       >
-        <Wallet className="w-4 h-4 text-primary" />
+        <Wallet className="w-4 h-4 text-accent" />
         <div className="flex flex-col items-start">
-          <span className="text-xs text-muted-foreground">Wallet</span>
-          <span className="font-semibold text-primary">
+          <span className="text-xs text-muted-foreground">Connected</span>
+          <span className="font-semibold text-accent">
             {selectedAccount.address.slice(0, 6)}...{selectedAccount.address.slice(-4)}
           </span>
         </div>
@@ -105,7 +115,12 @@ export default function WalletManager() {
           {/* Header */}
           <div className="p-4 border-b border-border/50">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Wallet Manager</h3>
+              <div>
+                <h3 className="font-semibold text-sm">Wallet Manager</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {connectedAccounts.length} account{connectedAccounts.length !== 1 ? 's' : ''} connected
+                </p>
+              </div>
               <button
                 onClick={() => {
                   disconnectWallet()
@@ -117,9 +132,6 @@ export default function WalletManager() {
                 <LogOut className="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {connectedAccounts.length} account{connectedAccounts.length !== 1 ? 's' : ''} connected
-            </p>
           </div>
 
           {/* Extension Selection View */}
@@ -192,7 +204,6 @@ export default function WalletManager() {
                 {connectedAccounts.map((account, index) => {
                   const isActive = account.address === selectedAccount.address
                   const isEditing = editingAddress === account.address
-                  // Use index as backup to ensure uniqueness
                   const uniqueKey = `${account.address}-${account.source}-${index}`
 
                   return (
@@ -245,7 +256,7 @@ export default function WalletManager() {
                               </button>
                             </div>
                             {isActive && (
-                              <span className="flex items-center gap-1 text-xs font-medium text-primary">
+                              <span className="flex items-center gap-1 text-xs font-medium text-accent">
                                 <Check className="w-3 h-3" />
                                 Active
                               </span>
