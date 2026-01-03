@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-     "check": "tsc --noEmit",
+    "check": "tsc --noEmit",
     "lint": "eslint .",
     "start": "next start",
     "verify-data": "tsx scripts/verify-data.ts",
@@ -68,7 +68,7 @@
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
-    "next": "16.0.0",
+    "next": "16.0.10",
     "next-themes": "^0.4.6",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
