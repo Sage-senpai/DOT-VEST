@@ -1,263 +1,140 @@
-// FILE: app/dashboard/layout.tsx (FIXED - No Auto Profile Modal)
 "use client"
 
 import type React from "react"
-import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { LayoutDashboard, Layers, BarChart3, User, LogOut, Menu, X, Zap, Lock } from "lucide-react"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, TrendingUp, BarChart3, Settings, LogOut, Menu, X, Zap, Lock, User, ChevronRight, Wallet as WalletIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ProfileModal } from "@/components/core/profile-modal"
 import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useProfile } from "@/hooks/use-profile"
-import { useEnhancedPolkadot } from "@/hooks/use-enhanced-polkadot"
-import { useAuth } from "@/hooks/auth/useAuth"
-import { DashboardProvider, useDashboardState } from "@/hooks/use-dashboard-state"
-import { cn } from "@/lib/utils"
-import WalletManager from "@/components/core/wallet-manager"
+import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: TrendingUp, label: "Pools", href: "/dashboard/aggregator" },
-  { icon: Lock, label: "Vaults", href: "/dashboard/vaults" },
+  { icon: Layers, label: "Pools", href: "/dashboard/aggregator" },
+  { icon: Lock, label: "Vault", href: "/dashboard/vaults" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-  { icon: User, label: "Profile", href: "/dashboard/profile"}
+  { icon: User, label: "Profile", href: "/dashboard/settings" },
 ]
 
-function DashboardContent({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [sidebarHovered, setSidebarHovered] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  
-  const { profile, mounted: profileMounted } = useProfile()
-  const { selectedAccount, isReady } = useEnhancedPolkadot()
-  const { signOut } = useAuth()
-  const { isWalletConnected, totalStrategies, totalVaults, isSyncing } = useDashboardState()
+  const { profile, mounted } = useProfile()
+  const { selectedAccount, connectWallet, isReady, error } = usePolkadotExtension()
+  const pathname = usePathname()
+
+  const getHeaderTitle = () => {
+    if (pathname === "/dashboard") return "Dashboard"
+    if (pathname === "/dashboard/aggregator") return "Pools"
+    if (pathname === "/dashboard/vaults") return "Vault"
+    if (pathname === "/dashboard/analytics") return "Analytics"
+    if (pathname === "/dashboard/settings") return "Profile"
+    return "Dashboard"
+  }
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    if (mounted && !profile) {
+      setProfileModalOpen(true)
+    }
+  }, [mounted, profile])
 
-  // REMOVED: Auto-open profile modal check
-  // Users can manually open it via avatar button or Profile page
-
-  const currentPage = navItems.find(item => item.href === pathname)
-  const pageTitle = currentPage?.label || "Dashboard"
-
-  const showSidebar = sidebarOpen || sidebarHovered
+  useEffect(() => {
+    if (!isReady && !error) {
+      connectWallet().catch((err) => console.log("[v0] Wallet connection failed:", err))
+    }
+  }, [isReady, error, connectWallet])
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
+    <div className="flex h-screen bg-background">
+      {/* Sidebar - solid card style per Figma */}
       <aside
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-        className={cn(
-          "fixed lg:relative h-full z-40 transition-all duration-300 ease-in-out",
-          "backdrop-blur-xl bg-card/95 dark:bg-card/80 border-r border-border/50",
-          "flex flex-col",
-          showSidebar ? "w-64" : "w-20",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}
+        className={`${sidebarOpen ? "w-64" : "w-20"} bg-card border-r border-border transition-all duration-300 flex flex-col shadow-sm`}
       >
-        <div className={cn(
-          "h-16 flex items-center border-b border-border/50 px-4 transition-all duration-300",
-          showSidebar ? "justify-between" : "justify-center"
-        )}>
-          {showSidebar && (
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="relative">
-                <Zap className="w-5 h-5 text-primary group-hover:text-accent transition-colors duration-300" />
-                <div className="absolute inset-0 bg-primary/20 blur-lg group-hover:bg-accent/30 transition-all duration-300" />
-              </div>
-              <span className="font-bold text-sm bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                DOTVEST
-              </span>
-            </Link>
-          )}
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className={cn(
-              "p-2 hover:bg-accent/10 rounded-lg transition-all duration-300",
-              "hover:scale-110 active:scale-95"
-            )}
-          >
-            {showSidebar ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            {sidebarOpen && <span className="font-bold text-sm">DOTVEST</span>}
+          </Link>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-card rounded transition-colors">
+            {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Navigation - active = gradient bar + light green bg */}
+        <nav className="flex-1 px-2 py-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
-            
-            let badge: number | null = null
-            if (item.href === '/dashboard/aggregator') badge = totalStrategies
-            if (item.href === '/dashboard/vaults') badge = totalVaults
-            
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all duration-300",
-                  "group relative overflow-hidden",
-                  isActive 
-                    ? "bg-primary/10 text-primary dark:bg-primary/20 shadow-lg shadow-primary/20" 
-                    : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
-                  !showSidebar && "justify-center"
-                )}
+                className={`flex items-center gap-3 pl-3 pr-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  isActive
+                    ? "sidebar-item-active text-primary font-medium bg-[#eafbf6]"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
               >
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-lg shadow-primary/50" />
-                )}
-                
-                <div className={cn(
-                  "relative transition-all duration-300",
-                  "group-hover:scale-110 group-hover:rotate-3",
-                  "group-active:scale-95",
-                  isActive && "animate-pulse"
-                )}>
-                  <Icon className={cn(
-                    "w-5 h-5 shrink-0 transition-all duration-300",
-                    isActive && "drop-shadow-[0_0_8px_rgba(230,0,122,0.5)]"
-                  )} />
-                </div>
-
-                {showSidebar && (
-                  <>
-                    <span className="flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                      {item.label}
-                    </span>
-                    {badge !== null && badge > 0 && (
-                      <span className="px-2 py-0.5 text-xs font-semibold bg-primary/20 text-primary rounded-full">
-                        {badge}
-                      </span>
-                    )}
-                  </>
-                )}
-
-                {!showSidebar && (
-                  <ChevronRight className={cn(
-                    "absolute right-0 w-4 h-4 opacity-0 -translate-x-2",
-                    "group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
-                  )} />
-                )}
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {sidebarOpen && <span>{item.label}</span>}
               </Link>
             )
           })}
         </nav>
 
-        {showSidebar && (
-          <div className="px-4 py-3 border-t border-border/50">
-            <div className={cn(
-              "flex items-center gap-2 p-2 rounded-lg text-xs",
-              isWalletConnected ? "bg-accent/10 text-accent" : "bg-muted"
-            )}>
-              <WalletIcon className="w-3 h-3" />
-              <span className="flex-1">
-                {isWalletConnected ? 'Wallet Connected' : 'No Wallet'}
-              </span>
-              {isSyncing && (
-                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className={cn(
-          "p-4 border-t border-border/50",
-          !showSidebar && "flex justify-center"
-        )}>
-          <Button 
-            variant="outline" 
-            size={showSidebar ? "sm" : "icon"}
-            className={cn(
-              "transition-all duration-300 hover:scale-105 active:scale-95",
-              "hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50",
-              showSidebar ? "w-full justify-center gap-2" : ""
-            )}
-            onClick={async () => {
-              await signOut()
-              router.push("/")
-            }}
-          >
+        {/* Log Out */}
+        <div className="p-4 border-t border-border">
+          <Button variant="outline" size="sm" className="w-full justify-center gap-2">
             <LogOut className="w-4 h-4" />
-            {showSidebar && "Logout"}
+            {sidebarOpen && "Log Out"}
           </Button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto flex flex-col">
-        <div className="h-16 backdrop-blur-xl bg-card/95 dark:bg-card/80 border-b border-border dark:border-border/70 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20">
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        {/* Top Bar - solid, wallet + theme + avatar */}
+        <div className="h-16 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm">
+          <h1 className="text-xl font-semibold text-foreground">{getHeaderTitle()}</h1>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)} 
-              className="lg:hidden p-2 hover:bg-accent/10 rounded-lg transition-all duration-300 hover:scale-110 active:scale-95"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              {pageTitle}
-            </h1>
-            {isSyncing && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                Syncing...
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <WalletManager />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Wallet Connected</span>
+              <span className="inline-flex items-center gap-1.5 bg-muted/30 px-3 py-1.5 rounded-lg">
+                <span className="text-primary font-semibold">
+                  {selectedAccount ? selectedAccount.address.slice(0, 6) + "..." + selectedAccount.address.slice(-4) : "Not connected"}
+                </span>
+                <span className="size-2 rounded-full bg-success" aria-hidden />
+              </span>
+            </div>
             <ThemeToggle />
-
-            {mounted && (
-              <button
-                onClick={() => setProfileModalOpen(true)}
-                className={cn(
-                  "w-10 h-10 rounded-full transition-all duration-300",
-                  "bg-gradient-to-br from-primary to-accent",
-                  "hover:shadow-xl hover:shadow-primary/30 hover:scale-110",
-                  "active:scale-95",
-                  "flex items-center justify-center border-2 border-transparent hover:border-primary/20"
-                )}
-                title="Edit profile"
-              >
-                {profile ? (
-                  profile.profileImage ? (
-                    <img
-                      src={profile.profileImage}
-                      alt="Profile"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <span className="text-xs font-bold text-primary-foreground">
-                      {(profile.name || 'U').charAt(0).toUpperCase()}
-                    </span>
-                  )
-                ) : (
-                  <User className="w-5 h-5 text-primary-foreground" />
-                )}
-              </button>
-            )}
+            <button
+              onClick={() => setProfileModalOpen(true)}
+              className="w-10 h-10 rounded-full bg-[#0d9488] text-white hover:opacity-90 transition-opacity flex items-center justify-center font-semibold"
+              title="Edit profile"
+            >
+              {profile ? (
+                <span className="text-sm font-bold">
+                  {profile.name.charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <User className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {children}
-        </div>
+        {/* Page Content */}
+        <div className="p-8">{children}</div>
       </main>
 
       <ProfileModal
@@ -266,17 +143,5 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         walletAddress={selectedAccount?.address || undefined}
       />
     </div>
-  )
-}
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <DashboardProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </DashboardProvider>
   )
 }
