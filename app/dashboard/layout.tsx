@@ -124,7 +124,7 @@ export default function DashboardLayout({
             >
               {profile ? (
                 <span className="text-sm font-bold">
-                  {profile.name.charAt(0).toUpperCase()}
+                  {profile.name?.charAt(0)?.toUpperCase() ?? "?"}
                 </span>
               ) : (
                 <User className="w-5 h-5" />
