@@ -102,9 +102,9 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar - solid, wallet + theme + avatar */}
-        <div className="h-16 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm">
+        <div className="h-16 flex-shrink-0 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm z-10">
           <h1 className="text-xl font-semibold text-foreground">{getHeaderTitle()}</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
@@ -124,7 +124,7 @@ export default function DashboardLayout({
             >
               {profile ? (
                 <span className="text-sm font-bold">
-                  {profile.name.charAt(0).toUpperCase()}
+                  {profile.name?.charAt(0).toUpperCase()}
                 </span>
               ) : (
                 <User className="w-5 h-5" />
@@ -134,7 +134,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Page Content */}
-        <div className="p-8">{children}</div>
+        <div className="flex-1 overflow-auto p-8">{children}</div>
       </main>
 
       <ProfileModal

@@ -1,3 +1,4 @@
+//app/(auth)/reset-password/reset-password-content.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
