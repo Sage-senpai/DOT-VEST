@@ -1,19 +1,35 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { Search, DollarSign, Clock, Shield } from 'lucide-react'
+import { Search, DollarSign, Clock, Shield, TrendingUp, Layers, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+
+interface PoolResult {
+  name: string
+  protocol: string
+  chain: string
+  apy: number
+  tvlUsd: number
+  riskScore: number
+  symbol: string
+}
 
 export default function OptimalPoolForm() {
   const [amount, setAmount] = useState(1000)
   const [duration, setDuration] = useState(6)
   const [riskTolerance, setRiskTolerance] = useState('medium')
   const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<PoolResult | null>(null)
+  const [noResult, setNoResult] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleSubmit = async () => {
     setLoading(true)
+    setResult(null)
+    setNoResult(false)
     try {
       const res = await fetch('/api/pools/live/optimal', {
         method: 'POST',
@@ -23,11 +39,14 @@ export default function OptimalPoolForm() {
 
       const data = await res.json()
 
-      if (data.success) {
+      if (data.success && data.data) {
+        setResult(data.data)
+      } else if (data.success && !data.data) {
+        setNoResult(true)
         toast({
-          title: 'Optimal pool found!',
-          description: `Best pool: ${data.data[0]?.name || 'N/A'}`,
-          variant: 'success',
+          title: 'No pools found',
+          description: 'No pools matched your criteria. Try adjusting risk tolerance.',
+          variant: 'error',
         })
       } else {
         toast({
@@ -46,6 +65,16 @@ export default function OptimalPoolForm() {
       setLoading(false)
     }
   }
+
+  const formatTVL = (tvl: number) => {
+    if (tvl >= 1_000_000) return `$${(tvl / 1_000_000).toFixed(2)}M`
+    if (tvl >= 1_000) return `$${(tvl / 1_000).toFixed(1)}K`
+    return `$${tvl.toFixed(0)}`
+  }
+
+  const estimatedReturn = result
+    ? amount * (Math.pow(1 + result.apy / 100, duration / 12) - 1)
+    : 0
 
   return (
     <section className="py-20 px-4 sm:px-6 lg:px-8">
@@ -122,6 +151,70 @@ export default function OptimalPoolForm() {
             </Button>
           </div>
         </div>
+
+        {/* Result Card */}
+        {result && (
+          <div className="mt-8 backdrop-blur-xl bg-card/40 border border-primary/30 p-8 rounded-2xl animate-fade-in-up">
+            <div className="flex items-center gap-2 mb-6">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h3 className="text-xl font-semibold">Best Match Found</h3>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Pool</p>
+                <p className="text-lg font-bold">{result.name}</p>
+                <p className="text-xs text-muted-foreground">{result.protocol}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">APY</p>
+                <p className="text-lg font-bold text-success">{result.apy.toFixed(2)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">TVL</p>
+                <p className="text-lg font-bold">{formatTVL(result.tvlUsd)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Risk Score</p>
+                <p className="text-lg font-bold text-primary">{result.riskScore}/100</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-xs">
+                  {result.chain}
+                </span>
+                <span>
+                  Est. return on ${amount.toLocaleString()} over {duration}mo: <strong className="text-success">${estimatedReturn.toFixed(2)}</strong>
+                </span>
+              </div>
+              <Button
+                onClick={() => router.push('/dashboard/aggregator')}
+                className="sm:ml-auto bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              >
+                <Layers className="w-4 h-4" />
+                Start Earning
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* No result message */}
+        {noResult && (
+          <div className="mt-8 backdrop-blur-xl bg-card/40 border border-border/50 p-8 rounded-2xl text-center">
+            <p className="text-muted-foreground mb-4">No pools found for <strong>{riskTolerance}</strong> risk tolerance. Try a different setting.</p>
+            <Button
+              onClick={() => router.push('/dashboard/aggregator')}
+              variant="outline"
+              className="gap-2"
+            >
+              Browse All Pools
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   )
