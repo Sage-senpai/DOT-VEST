@@ -26,9 +26,17 @@ export function useEvmWallet() {
     isCorrectChain: false,
   })
 
-  // Check if already connected on mount
+  // Track whether user explicitly disconnected (persists across re-renders)
+  const [manuallyDisconnected, setManuallyDisconnected] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('evm-disconnected') === 'true'
+    }
+    return false
+  })
+
+  // Check if already connected on mount (skip if user manually disconnected)
   useEffect(() => {
-    if (!hasEvmProvider()) return
+    if (!hasEvmProvider() || manuallyDisconnected) return
 
     const checkConnection = async () => {
       try {
@@ -93,7 +101,7 @@ export function useEvmWallet() {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged)
       window.ethereum?.removeListener('chainChanged', handleChainChanged)
     }
-  }, [])
+  }, [manuallyDisconnected])
 
   // Fetch balance when address or chain changes
   useEffect(() => {
@@ -120,11 +128,21 @@ export function useEvmWallet() {
       return
     }
 
+    // Clear the disconnected flag
+    setManuallyDisconnected(false)
+    sessionStorage.removeItem('evm-disconnected')
+
     setState(prev => ({ ...prev, isConnecting: true, error: null }))
 
     try {
+      // Use wallet_requestPermissions to force the account picker every time
+      await window.ethereum!.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      })
+
       const accounts = await window.ethereum!.request({
-        method: 'eth_requestAccounts',
+        method: 'eth_accounts',
       }) as string[]
 
       if (accounts.length > 0) {
@@ -180,7 +198,23 @@ export function useEvmWallet() {
     }
   }, [])
 
-  const disconnectEvmWallet = useCallback(() => {
+  const disconnectEvmWallet = useCallback(async () => {
+    // Try to revoke permissions (MetaMask supports this)
+    if (hasEvmProvider()) {
+      try {
+        await window.ethereum!.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        })
+      } catch {
+        // Not all wallets support revokePermissions — that's OK
+      }
+    }
+
+    // Mark as manually disconnected so auto-reconnect doesn't fire
+    setManuallyDisconnected(true)
+    sessionStorage.setItem('evm-disconnected', 'true')
+
     setState({
       evmAddress: null,
       isEvmConnected: false,
