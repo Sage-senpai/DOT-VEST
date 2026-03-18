@@ -3,11 +3,12 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { LayoutDashboard, Layers, BarChart3, User, LogOut, Menu, X, Zap, Lock } from "lucide-react"
+import { LayoutDashboard, Layers, BarChart3, User, LogOut, Menu, X, Zap, Lock, Code2, ArrowRightLeft } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ProfileModal } from "@/components/core/profile-modal"
 import { ThemeToggle } from "@/components/core/theme-toggle"
+import { EvmWalletButton } from "@/components/core/evm-wallet-button"
 import { useProfile } from "@/hooks/use-profile"
 import { usePolkadotExtension } from "@/hooks/use-polkadot-extension"
 
@@ -15,7 +16,9 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Layers, label: "Pools", href: "/dashboard/aggregator" },
   { icon: Lock, label: "Vault", href: "/dashboard/vaults" },
+  { icon: ArrowRightLeft, label: "Bridge", href: "/dashboard/bridge" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
+  { icon: Code2, label: "PVM Contracts", href: "/dashboard/contracts" },
   { icon: User, label: "Profile", href: "/dashboard/settings" },
 ]
 
@@ -34,7 +37,9 @@ export default function DashboardLayout({
     if (pathname === "/dashboard") return "Dashboard"
     if (pathname === "/dashboard/aggregator") return "Pools"
     if (pathname === "/dashboard/vaults") return "Vault"
+    if (pathname === "/dashboard/bridge") return "Bridge"
     if (pathname === "/dashboard/analytics") return "Analytics"
+    if (pathname === "/dashboard/contracts") return "PVM Contracts"
     if (pathname === "/dashboard/settings") return "Profile"
     return "Dashboard"
   }
@@ -106,16 +111,16 @@ export default function DashboardLayout({
         {/* Top Bar - solid, wallet + theme + avatar */}
         <div className="h-16 flex-shrink-0 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm z-10">
           <h1 className="text-xl font-semibold text-foreground">{getHeaderTitle()}</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Wallet Connected</span>
               <span className="inline-flex items-center gap-1.5 bg-muted/30 px-3 py-1.5 rounded-lg">
-                <span className="text-primary font-semibold">
+                <span className="text-primary font-semibold text-xs">
                   {selectedAccount ? selectedAccount.address.slice(0, 6) + "..." + selectedAccount.address.slice(-4) : "Not connected"}
                 </span>
                 <span className="size-2 rounded-full bg-success" aria-hidden />
               </span>
             </div>
+            <EvmWalletButton />
             <ThemeToggle />
             <button
               onClick={() => setProfileModalOpen(true)}

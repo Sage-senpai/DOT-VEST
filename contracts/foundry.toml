@@ -1,0 +1,12 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+
+[etherscan]
+polkadot-hub-testnet = { key = "", url = "https://blockscout-testnet.polkadot.io/api?", chain = 420420417 }
+
+[rpc_endpoints]
+polkadot-hub-testnet = "https://services.polkadothub-rpc.com/testnet"
+polkadot-hub-mainnet = "https://services.polkadothub-rpc.com/mainnet"
