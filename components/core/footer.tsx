@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Github, Twitter, Linkedin, Mail } from "lucide-react"
+import { DotVestLogoIcon } from "@/components/core/dotvest-logo"
 
 export function Footer() {
   return (
@@ -10,7 +11,10 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div>
-            <h3 className="font-bold text-lg mb-4">DOTVEST</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <DotVestLogoIcon size={24} />
+              <h3 className="font-bold text-lg">DOTVEST</h3>
+            </div>
             <p className="text-sm text-muted-foreground">Premium Polkadot DeFi aggregator powered by AI</p>
           </div>
 

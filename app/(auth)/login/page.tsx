@@ -5,7 +5,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Mail, Lock, Loader2 } from 'lucide-react'
+import { Mail, Lock, Loader2 } from 'lucide-react'
+import { DotVestLogoIcon } from '@/components/core/dotvest-logo'
 import { useAuth } from '@/hooks/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import styles from './styles.module.css'
@@ -39,7 +40,7 @@ export default function LoginPage() {
       <div className={styles.content}>
         {/* Logo */}
         <Link href="/" className={styles.logo}>
-          <Zap className={styles.logoIcon} />
+          <DotVestLogoIcon size={24} />
           <span className={styles.logoText}>DOTVEST</span>
         </Link>
 
