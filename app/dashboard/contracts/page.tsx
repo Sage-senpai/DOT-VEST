@@ -11,7 +11,7 @@ import { useBridgeContract } from "@/hooks/use-bridge-contract"
 import { CONTRACTS, PRECOMPILES, getExplorerAddressUrl, FAUCET_URL, activeChain } from "@/lib/contracts/config"
 
 export default function PVMContractsPage() {
-  const { evmAddress, isEvmConnected, isCorrectChain, evmBalance } = useEvmWallet()
+  const { evmAddress, isEvmConnected, isCorrectChain, evmBalance, hasEvmProvider, connectEvmWallet, switchToPolkadotHub, disconnectEvmWallet, isConnecting } = useEvmWallet()
   const { computeBlake2Hash, getPolkadotAccountId } = useStrategyContract()
   const { getVaultStats } = useVaultContract()
   const { estimateXcmWeight } = useBridgeContract()
@@ -106,28 +106,64 @@ export default function PVMContractsPage() {
 
       {/* Connection Status */}
       <Card className="card-solid p-6">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">EVM Wallet:</span>
-            <span className={`text-sm font-semibold ${isEvmConnected ? "text-success" : "text-destructive"}`}>
-              {isEvmConnected ? `${evmAddress!.slice(0, 6)}...${evmAddress!.slice(-4)}` : "Not Connected"}
-            </span>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">EVM Wallet:</span>
+              <span className={`text-sm font-semibold ${isEvmConnected ? "text-success" : "text-destructive"}`}>
+                {isEvmConnected ? `${evmAddress!.slice(0, 6)}...${evmAddress!.slice(-4)}` : "Not Connected"}
+              </span>
+            </div>
+            {isEvmConnected && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Network:</span>
+                  <span className={`text-sm font-semibold ${isCorrectChain ? "text-success" : "text-yellow-500"}`}>
+                    {isCorrectChain ? activeChain.name : "Wrong Network"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Balance:</span>
+                  <span className="text-sm font-semibold">{Number(evmBalance).toFixed(4)} {activeChain.nativeCurrency.symbol}</span>
+                </div>
+              </>
+            )}
+            <a href={FAUCET_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+              Get Testnet Tokens <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
           <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Network:</span>
-            <span className={`text-sm font-semibold ${isCorrectChain ? "text-success" : "text-yellow-500"}`}>
-              {isCorrectChain ? activeChain.name : "Wrong Network"}
-            </span>
+            {!isEvmConnected ? (
+              <Button
+                onClick={connectEvmWallet}
+                disabled={isConnecting || !hasEvmProvider}
+                size="sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {isConnecting ? "Connecting..." : !hasEvmProvider ? "Install MetaMask" : "Connect EVM Wallet"}
+              </Button>
+            ) : !isCorrectChain ? (
+              <Button
+                onClick={switchToPolkadotHub}
+                size="sm"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                Switch to {activeChain.name}
+              </Button>
+            ) : null}
+            {isEvmConnected && (
+              <Button
+                onClick={disconnectEvmWallet}
+                size="sm"
+                variant="outline"
+                className="border-destructive/50 text-destructive hover:bg-destructive/10"
+              >
+                Disconnect
+              </Button>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Balance:</span>
-            <span className="text-sm font-semibold">{Number(evmBalance).toFixed(4)} {activeChain.nativeCurrency.symbol}</span>
-          </div>
-          <a href={FAUCET_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
-            Get Testnet Tokens <ExternalLink className="w-3 h-3" />
-          </a>
         </div>
       </Card>
 
