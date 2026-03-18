@@ -1,0 +1,10 @@
+# Compiler output
+out/
+out-pvm/
+cache/
+
+# Environment
+.env
+
+# Dependencies
+lib/

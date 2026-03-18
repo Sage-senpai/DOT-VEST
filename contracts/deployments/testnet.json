@@ -1,0 +1,22 @@
+{
+  "chainId": 420420417,
+  "network": "Polkadot Hub Testnet",
+  "rpcUrl": "https://services.polkadothub-rpc.com/testnet",
+  "blockExplorer": "https://blockscout-testnet.polkadot.io",
+  "contracts": {
+    "DotVestVault": "0xd5bA77a0Db0fd2A784513D705A23Ce20C998C61d",
+    "DotVestStrategy": "0xd5005F670E5BeC7558c018eB7CE485EB41621F38",
+    "DotVestBridge": "0xA7deCb55d84a42D5057f4b88eD511EFabC4B7F43"
+  },
+  "precompiles": {
+    "System": "0x0000000000000000000000000000000000000900",
+    "XCM": "0x00000000000000000000000000000000000a0000"
+  },
+  "deployedAt": "2026-03-18",
+  "deployer": "0xf790ee375Dbb3849b1eF67Cf9Fe37679b83a2815",
+  "txHashes": {
+    "DotVestVault": "0xee8854a32dc8d0a61cd3d451428cde83d2fff782088011960a2d01a395956b22",
+    "DotVestStrategy": "0xd6115223721cf670040710c17360d78d1103a7ea736c2d2f0e26303cf9ed15e5",
+    "DotVestBridge": "0xd20a805c7f5e9724e17f1b91cc332f9a72b0c22c8a6102e5aa6d3a695cbd2ffc"
+  }
+}
