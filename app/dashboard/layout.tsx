@@ -3,7 +3,8 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { LayoutDashboard, Layers, BarChart3, User, LogOut, Menu, X, Zap, Lock, Code2, ArrowRightLeft } from "lucide-react"
+import { LayoutDashboard, Layers, BarChart3, User, LogOut, Menu, X, Lock, Code2, ArrowRightLeft } from "lucide-react"
+import { DotVestLogo } from "@/components/core/dotvest-logo"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ProfileModal } from "@/components/core/profile-modal"
@@ -65,9 +66,7 @@ export default function DashboardLayout({
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
+            <DotVestLogo size={32} />
             {sidebarOpen && <span className="font-bold text-sm">DOTVEST</span>}
           </Link>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-card rounded transition-colors">

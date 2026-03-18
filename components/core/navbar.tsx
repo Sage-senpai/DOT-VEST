@@ -4,7 +4,8 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, Zap } from "lucide-react"
+import { Menu, X } from "lucide-react"
+import { DotVestLogoIcon } from "@/components/core/dotvest-logo"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/core/theme-toggle"
 import { useAuth } from "@/hooks/auth/useAuth"
@@ -51,10 +52,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative">
-              <Zap className="w-6 h-6 text-primary group-hover:text-accent transition-colors duration-300" />
-              <div className="absolute inset-0 bg-primary/20 blur-lg group-hover:bg-accent/30 transition-all duration-300" />
-            </div>
+            <DotVestLogoIcon size={28} className="group-hover:scale-110 transition-transform duration-300" />
             <span className="font-bold text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               DOTVEST
             </span>

@@ -3,7 +3,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Zap, Mail, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
+import { DotVestLogoIcon } from '@/components/core/dotvest-logo'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import styles from '../register/styles.module.css'
@@ -66,7 +67,7 @@ export default function ForgotPasswordPage() {
 
       <div className={styles.content}>
         <Link href="/" className={styles.logo}>
-          <Zap className={styles.logoIcon} />
+          <DotVestLogoIcon size={24} />
           <span className={styles.logoText}>DOTVEST</span>
         </Link>
 

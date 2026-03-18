@@ -11,6 +11,12 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "DotVest - Polkadot DeFi Yield Optimizer",
   description: "Maximize your yields across the Polkadot ecosystem",
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

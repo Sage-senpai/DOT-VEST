@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Mail, Lock, User, CheckCircle2, Wallet, Loader2, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { Mail, Lock, User, CheckCircle2, Wallet, Loader2, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { DotVestLogoIcon } from '@/components/core/dotvest-logo'
 import { useAuth } from '@/hooks/auth/useAuth'
 import { useEnhancedPolkadot } from '@/hooks/use-enhanced-polkadot'
 import { Button } from '@/components/ui/button'
@@ -129,7 +130,7 @@ export default function RegisterPage() {
 
       <div className={styles.content}>
         <Link href="/" className={styles.logo}>
-          <Zap className={styles.logoIcon} />
+          <DotVestLogoIcon size={24} />
           <span className={styles.logoText}>DOTVEST</span>
         </Link>
 

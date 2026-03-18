@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Lock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { Lock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { DotVestLogoIcon } from '@/components/core/dotvest-logo'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
 import styles from '../register/styles.module.css'
@@ -162,7 +163,7 @@ export default function ResetPasswordPageContent() {
  
        <div className={styles.content}>
          <Link href="/" className={styles.logo}>
-           <Zap className={styles.logoIcon} />
+           <DotVestLogoIcon size={24} />
            <span className={styles.logoText}>DOTVEST</span>
          </Link>
  
