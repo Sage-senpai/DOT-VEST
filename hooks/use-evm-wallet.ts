@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatEther } from 'viem'
 import { getPublicClient, hasEvmProvider } from '@/lib/contracts/client'
 import { activeChain } from '@/lib/contracts/config'
@@ -15,56 +15,63 @@ interface EvmWalletState {
   isCorrectChain: boolean
 }
 
+const DISCONNECTED_KEY = 'evm-disconnected'
+
+function isDisconnected(): boolean {
+  if (typeof window === 'undefined') return false
+  return sessionStorage.getItem(DISCONNECTED_KEY) === 'true'
+}
+
+const emptyState: EvmWalletState = {
+  evmAddress: null,
+  isEvmConnected: false,
+  evmBalance: '0',
+  isConnecting: false,
+  error: null,
+  chainId: null,
+  isCorrectChain: false,
+}
+
 export function useEvmWallet() {
-  const [state, setState] = useState<EvmWalletState>({
-    evmAddress: null,
-    isEvmConnected: false,
-    evmBalance: '0',
-    isConnecting: false,
-    error: null,
-    chainId: null,
-    isCorrectChain: false,
-  })
+  const [state, setState] = useState<EvmWalletState>(emptyState)
+  // Use a ref so event listeners always see the latest value
+  const disconnectedRef = useRef(false)
 
-  // Track whether user explicitly disconnected (persists across re-renders)
-  const [manuallyDisconnected, setManuallyDisconnected] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('evm-disconnected') === 'true'
-    }
-    return false
-  })
-
-  // Check if already connected on mount (skip if user manually disconnected)
+  // Sync ref on mount
   useEffect(() => {
-    if (!hasEvmProvider() || manuallyDisconnected) return
+    disconnectedRef.current = isDisconnected()
+  }, [])
 
-    const checkConnection = async () => {
-      try {
-        const accounts = await window.ethereum!.request({
-          method: 'eth_accounts',
-        }) as string[]
+  // Set up listeners once — they check disconnectedRef on every event
+  useEffect(() => {
+    if (!hasEvmProvider()) return
 
-        if (accounts.length > 0) {
-          const address = accounts[0] as `0x${string}`
-          const chainId = Number(await window.ethereum!.request({ method: 'eth_chainId' }))
-
-          setState(prev => ({
-            ...prev,
-            evmAddress: address,
-            isEvmConnected: true,
-            chainId,
-            isCorrectChain: chainId === activeChain.id,
-          }))
+    // Auto-connect on mount if not disconnected
+    if (!disconnectedRef.current) {
+      ;(async () => {
+        try {
+          const accounts = await window.ethereum!.request({ method: 'eth_accounts' }) as string[]
+          if (accounts.length > 0 && !disconnectedRef.current) {
+            const address = accounts[0] as `0x${string}`
+            const chainId = Number(await window.ethereum!.request({ method: 'eth_chainId' }))
+            setState(prev => ({
+              ...prev,
+              evmAddress: address,
+              isEvmConnected: true,
+              chainId,
+              isCorrectChain: chainId === activeChain.id,
+            }))
+          }
+        } catch {
+          // Silently fail
         }
-      } catch {
-        // Silently fail — user hasn't connected yet
-      }
+      })()
     }
 
-    checkConnection()
-
-    // Listen for account/chain changes
     const handleAccountsChanged = (...args: unknown[]) => {
+      // If user manually disconnected, ignore all wallet events
+      if (disconnectedRef.current) return
+
       const accounts = args[0] as string[]
       if (accounts.length === 0) {
         setState(prev => ({
@@ -85,6 +92,8 @@ export function useEvmWallet() {
     }
 
     const handleChainChanged = (...args: unknown[]) => {
+      if (disconnectedRef.current) return
+
       const chainIdHex = args[0] as string
       const chainId = Number(chainIdHex)
       setState(prev => ({
@@ -101,7 +110,7 @@ export function useEvmWallet() {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged)
       window.ethereum?.removeListener('chainChanged', handleChainChanged)
     }
-  }, [manuallyDisconnected])
+  }, [])
 
   // Fetch balance when address or chain changes
   useEffect(() => {
@@ -118,7 +127,7 @@ export function useEvmWallet() {
     }
 
     fetchBalance()
-    const interval = setInterval(fetchBalance, 15000) // refresh every 15s
+    const interval = setInterval(fetchBalance, 15000)
     return () => clearInterval(interval)
   }, [state.evmAddress, state.isCorrectChain])
 
@@ -128,22 +137,20 @@ export function useEvmWallet() {
       return
     }
 
-    // Clear the disconnected flag
-    setManuallyDisconnected(false)
-    sessionStorage.removeItem('evm-disconnected')
+    // Clear disconnected flag
+    disconnectedRef.current = false
+    sessionStorage.removeItem(DISCONNECTED_KEY)
 
     setState(prev => ({ ...prev, isConnecting: true, error: null }))
 
     try {
-      // Use wallet_requestPermissions to force the account picker every time
+      // Force account picker on every connect
       await window.ethereum!.request({
         method: 'wallet_requestPermissions',
         params: [{ eth_accounts: {} }],
       })
 
-      const accounts = await window.ethereum!.request({
-        method: 'eth_accounts',
-      }) as string[]
+      const accounts = await window.ethereum!.request({ method: 'eth_accounts' }) as string[]
 
       if (accounts.length > 0) {
         const address = accounts[0] as `0x${string}`
@@ -176,7 +183,6 @@ export function useEvmWallet() {
         params: [{ chainId: `0x${activeChain.id.toString(16)}` }],
       })
     } catch (switchError: any) {
-      // Chain not added — add it
       if (switchError.code === 4902) {
         try {
           await window.ethereum!.request({
@@ -199,6 +205,10 @@ export function useEvmWallet() {
   }, [])
 
   const disconnectEvmWallet = useCallback(async () => {
+    // Set disconnected flag FIRST so listeners ignore any subsequent events
+    disconnectedRef.current = true
+    sessionStorage.setItem(DISCONNECTED_KEY, 'true')
+
     // Try to revoke permissions (MetaMask supports this)
     if (hasEvmProvider()) {
       try {
@@ -207,23 +217,11 @@ export function useEvmWallet() {
           params: [{ eth_accounts: {} }],
         })
       } catch {
-        // Not all wallets support revokePermissions — that's OK
+        // Not all wallets support this — that's OK, we have the ref guard
       }
     }
 
-    // Mark as manually disconnected so auto-reconnect doesn't fire
-    setManuallyDisconnected(true)
-    sessionStorage.setItem('evm-disconnected', 'true')
-
-    setState({
-      evmAddress: null,
-      isEvmConnected: false,
-      evmBalance: '0',
-      isConnecting: false,
-      error: null,
-      chainId: null,
-      isCorrectChain: false,
-    })
+    setState({ ...emptyState })
   }, [])
 
   return {
