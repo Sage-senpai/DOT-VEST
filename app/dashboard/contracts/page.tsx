@@ -134,16 +134,19 @@ export default function PVMContractsPage() {
               Get Testnet Tokens <ExternalLink className="w-3 h-3" />
             </a>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {!isEvmConnected ? (
-              <Button
-                onClick={connectEvmWallet}
-                disabled={isConnecting || !hasEvmProvider}
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isConnecting ? "Connecting..." : !hasEvmProvider ? "Install MetaMask" : "Connect EVM Wallet"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={connectEvmWallet}
+                  disabled={isConnecting || !hasEvmProvider}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {isConnecting ? "Connecting..." : !hasEvmProvider ? "Install MetaMask" : "Connect EVM Wallet"}
+                </Button>
+                <span className="text-[10px] text-muted-foreground max-w-[140px] leading-tight">MetaMask recommended. Phantom does not support custom chains.</span>
+              </div>
             ) : !isCorrectChain ? (
               <Button
                 onClick={switchToPolkadotHub}
