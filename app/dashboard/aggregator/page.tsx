@@ -256,7 +256,7 @@ export default function Aggregator() {
                       className="flex-1 px-4 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                     <select className="px-4 py-2 bg-background border border-input rounded-lg text-sm text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                      <option>SOL</option>
+                      <option>DOT</option>
                     </select>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">= $0 USD</p>
@@ -319,7 +319,7 @@ export default function Aggregator() {
 
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Estimated Return</span>
-                  <span className="font-medium text-[#0d9488]">0.000 SOL</span>
+                  <span className="font-medium text-[#0d9488]">{estimatedReturn.toFixed(4)} DOT</span>
                 </div>
 
                 <div className="flex justify-between items-center text-sm">
