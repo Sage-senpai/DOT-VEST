@@ -41,7 +41,7 @@ export default function Dashboard() {
 
   const assetAllocation = [
     { name: "Polkadot", symbol: "DOT", value: 42, color: "#e6007a" },
-    { name: "Bitcoin", symbol: "BTC", value: 11, color: "#f59e0b" },
+    { name: "Acala Dollar", symbol: "aUSD", value: 11, color: "#f59e0b" },
     { name: "USDC", symbol: "USDC", value: 22, color: "#38bdf8" },
     { name: "USDT", symbol: "USDT", value: 25, color: "#2dd4bf" },
   ]
